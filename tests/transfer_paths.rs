@@ -211,3 +211,96 @@ async fn a_destination_file_with_a_backslash_is_left_and_the_push_finishes() {
     assert_eq!(read(&b.dev().join("app"), "new.txt"), "n");
     assert_eq!(read(&b.dev().join("app"), "odd\\name.txt"), "b");
 }
+
+/// Made on each computer separately: a push goes into the folder the other
+/// computer already has, never a " 2" beside it, and the ids then agree.
+#[tokio::test]
+async fn a_push_lands_in_the_same_named_project_made_there() {
+    let (a, b) = pair_full().await;
+    let src = a.project_dir("garden-planner");
+    write(&src, "beds.txt", "newest");
+    let mine = a
+        .add_project("Garden Planner", &[("garden-planner", &src)])
+        .await;
+    let theirs_dir = b.dev().join("garden-planner");
+    write(&theirs_dir, "beds.txt", "older");
+    let theirs = b
+        .add_project("garden planner", &[("garden-planner", &theirs_dir)])
+        .await;
+
+    let (preview, _) = push(&a, &b, mine.id, false).await;
+    assert_eq!(preview.request.project, theirs.id);
+    assert_eq!(
+        preview.folders[0].dest_path,
+        theirs_dir.display().to_string()
+    );
+    assert_eq!(read(&theirs_dir, "beds.txt"), "newest");
+    assert!(!b.dev().join("garden-planner 2").exists());
+    assert!(a.project(mine.id).await.is_none());
+    let now = a.project(theirs.id).await.expect("took their id");
+    assert_eq!(now.folders[0].id, theirs.folders[0].id);
+    assert_eq!(now.folders[0].local_path, Some(src));
+    assert_eq!(b.project(theirs.id).await.unwrap().folders.len(), 1);
+}
+
+#[tokio::test]
+async fn a_pull_lands_in_the_same_named_project_made_here() {
+    let (a, b) = pair_full().await;
+    let here = a.project_dir("tide-tables");
+    write(&here, "march.csv", "older");
+    let mine = a
+        .add_project("Tide Tables", &[("tide-tables", &here)])
+        .await;
+    let there = b.project_dir("tide-tables");
+    write(&there, "march.csv", "newest");
+    let theirs = b
+        .add_project("Tide Tables", &[("tide-tables", &there)])
+        .await;
+
+    let (preview, _) = pull(&a, &b, mine.id).await;
+    assert_eq!(preview.request.project, theirs.id);
+    assert!(preview.warnings[0].starts_with("Matched with the project `Tide Tables`"));
+    assert_eq!(read(&here, "march.csv"), "newest");
+    let all = a.shared.projects.read().await.clone();
+    assert_eq!(all.len(), 1, "no second project: {all:?}");
+    assert_eq!(all[0].folders[0].local_path, Some(here));
+    assert_eq!(all[0].folders[0].id, theirs.folders[0].id);
+}
+
+/// The match is saved only when the transfer runs.
+#[tokio::test]
+async fn a_cancelled_preview_leaves_the_project_as_it_was() {
+    let (a, b) = pair_full().await;
+    let here = a.project_dir("seed-catalog");
+    let mine = a
+        .add_project("Seed Catalog", &[("seed-catalog", &here)])
+        .await;
+    let there = b.project_dir("seed-catalog");
+    b.add_project("Seed Catalog", &[("seed-catalog", &there)])
+        .await;
+    let mut conn = a.open(&b).await;
+    let req = a.request(&b, mine.id, Direction::Push).await;
+    let preview = transfer::prepare(&mut conn, &a.shared, req).await.unwrap();
+    assert!(preview.link.is_some());
+    assert_eq!(a.project(mine.id).await.as_ref(), Some(&mine));
+    assert_eq!(a.shared.store.load_projects().unwrap(), vec![mine]);
+}
+
+/// Same project name, differently named folders: the other computer's
+/// folder arrives beside this one's instead of mirroring over it.
+#[tokio::test]
+async fn differently_named_folders_are_never_mirrored_onto_each_other() {
+    let (a, b) = pair_full().await;
+    let here = a.project_dir("notes");
+    write(&here, "mine.txt", "keep me");
+    let mine = a.add_project("Notes", &[("notes", &here)]).await;
+    let there = b.project_dir("work-notes");
+    write(&there, "theirs.txt", "t");
+    b.add_project("Notes", &[("work-notes", &there)]).await;
+
+    let (preview, _) = pull(&a, &b, mine.id).await;
+    assert_eq!(read(&here, "mine.txt"), "keep me");
+    let dest = a.dev().join("Notes").join("work-notes");
+    assert_eq!(preview.folders[0].dest_path, dest.display().to_string());
+    assert_eq!(read(&dest, "theirs.txt"), "t");
+}

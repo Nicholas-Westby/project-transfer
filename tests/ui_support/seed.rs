@@ -277,6 +277,7 @@ pub fn sample_preview(s: &UiState) -> Preview {
              the copy on Desktop Swift Heron."
                 .into(),
         ],
+        link: None,
     }
 }
 

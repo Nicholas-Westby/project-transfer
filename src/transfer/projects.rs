@@ -84,12 +84,14 @@ pub fn default_path(
     } else {
         (folder_name, None)
     };
+    // The project's own other folders count too: a new folder must never
+    // land inside one, or every push of that one would carry it along.
     let taken: Vec<(&str, &Path)> = all
         .iter()
-        .filter(|p| p.id != project)
         .flat_map(|p| {
             p.folders
                 .iter()
+                .filter(move |f| !(p.id == project && f.id == folder))
                 .filter_map(move |f| Some((p.name.as_str(), f.local_path.as_deref()?)))
         })
         .collect();

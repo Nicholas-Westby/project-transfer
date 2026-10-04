@@ -17,6 +17,9 @@ pub struct Preview {
     pub request: TransferRequest,
     pub folders: Vec<FolderPreview>,
     pub warnings: Vec<String>,
+    /// The other computer's ids this computer's project takes on when the
+    /// transfer runs; `request.project` is already the new id.
+    pub link: Option<super::link::Link>,
 }
 
 #[derive(Clone, Debug, PartialEq)]

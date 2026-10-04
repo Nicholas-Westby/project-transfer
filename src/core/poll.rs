@@ -6,6 +6,7 @@ use super::peers::can_do;
 use crate::model::{InstanceId, Permissions};
 use crate::net::{NotThePairedComputer, may_ask};
 use crate::protocol::{Request, Response};
+use crate::transfer::link::as_seen_here;
 use crate::transfer::projects::now_ms;
 use anyhow::bail;
 use std::collections::HashMap;
@@ -54,7 +55,7 @@ impl Core {
                 reachable
             };
             let mut remote = HashMap::new();
-            for p in list {
+            for p in &list {
                 let ask = Request::ProjectInfo { project: p.id };
                 // A peer that shares nothing with us would turn this away and
                 // warn its user about it on every poll.
@@ -66,6 +67,8 @@ impl Core {
                 }
             }
             conn.close().await;
+            let local = self.shared.projects.read().await;
+            let remote = as_seen_here(&local, &list, remote);
             Ok((allows, remote, reachable))
         }
         .await;

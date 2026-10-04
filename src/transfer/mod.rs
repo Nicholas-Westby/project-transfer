@@ -2,6 +2,7 @@
 
 pub mod apply;
 mod execute;
+pub mod link;
 mod prepare;
 mod preview;
 pub mod projects;

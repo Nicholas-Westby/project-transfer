@@ -108,6 +108,12 @@ can differ (`~/Dev/garden` on a Mac, `D:\dev\garden` on Windows).
   **Projects folder** from Settings (`~/Dev` on macOS, `%USERPROFILE%\Dev` on
   Windows). A single-folder project lands in `<Projects folder>/<folder>`; a
   project with several folders in `<Projects folder>/<project>/<folder>`.
+- Projects with the same name on two computers are the same project, even
+  when each computer created its own (case and outer spaces don't count).
+  Folders with the same name are matched too, so a push or pull goes into
+  the folder that computer already has, and the preview says it matched
+  them. This only happens when each computer has just one project of that
+  name. Folders with different names are never mirrored onto each other.
 - If that path already belongs to another project, the app adds a number
   instead of mixing the two: `app` becomes `app 2`, then `app 3`.
 - The preview always shows the path a new folder will get, and you can change

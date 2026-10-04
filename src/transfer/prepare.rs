@@ -4,12 +4,12 @@ use super::preview::{
     FolderPreview, Preview, Replaced, TransferRequest, drop_unholdable, replaced_folders,
 };
 use super::projects::{check_names_for, default_path};
-use super::safe_join;
+use super::{link, safe_join};
 use crate::ignore_rules::{IgnoreSpec, Matcher};
 use crate::manifest::{Manifest, compare, hash_file, resolve_hashes, scan};
 use crate::model::{Direction, FolderId, Os, Project, ProjectId};
 use crate::net::{Connection, Shared};
-use crate::protocol::{FolderScan, Request, Response};
+use crate::protocol::{FolderScan, ProjectSummary, Request, Response};
 use anyhow::{Context, bail};
 use std::collections::HashMap;
 use std::path::PathBuf;
@@ -44,10 +44,16 @@ pub(super) fn unexpected(conn: &Connection, what: &str, r: Response) -> anyhow::
 }
 
 /// Asks first, so a missing permission stops the preview with a clear reason.
-async fn check_allowed(conn: &mut Connection, direction: Direction) -> anyhow::Result<()> {
+/// Returns the other computer's projects.
+async fn check_allowed(
+    conn: &mut Connection,
+    direction: Direction,
+) -> anyhow::Result<Vec<ProjectSummary>> {
     let name = conn.peer_name().to_string();
-    let allows = match conn.request(&Request::Status).await? {
-        Response::Status { allows, .. } => allows,
+    let (allows, projects) = match conn.request(&Request::Status).await? {
+        Response::Status {
+            allows, projects, ..
+        } => (allows, projects),
         other => return Err(unexpected(conn, "the status request", other)),
     };
     match direction {
@@ -57,28 +63,38 @@ async fn check_allowed(conn: &mut Connection, direction: Direction) -> anyhow::R
         Direction::Pull if !allows.may_pull_from_me => bail!(
             "{name} doesn't let this computer pull from it. Allow pulling for it on {name}, then try again."
         ),
-        _ => Ok(()),
+        _ => Ok(projects),
     }
 }
 
 pub async fn prepare(
     conn: &mut Connection,
     shared: &Shared,
-    req: TransferRequest,
+    mut req: TransferRequest,
 ) -> anyhow::Result<Preview> {
     check_peer(conn, &req)?;
-    check_allowed(conn, req.direction).await?;
+    let theirs = check_allowed(conn, req.direction).await?;
+    let peer = conn.peer_name().to_string();
+    // The preview works on the projects as they will be once a match with
+    // the other computer's project is saved, which only running it does.
+    let mut projects = shared.projects.read().await.clone();
+    let mut warnings = Vec::new();
+    let link = link::plan(conn, &projects, req.project, &theirs).await?;
+    if let Some(l) = &link {
+        link::rekey(&mut projects, l.from, l.to, &l.folders).map_err(|e| anyhow::anyhow!(e))?;
+        req.project = l.to;
+        warnings.push(l.warning(&peer));
+    }
     let settings = shared.settings.read().await.clone();
     let mut spec = IgnoreSpec::from_settings(&settings);
     spec.send_everything = req.send_everything;
     Matcher::new(&spec)?;
-    let local = local_project(shared, req.project).await;
-    let peer = conn.peer_name().to_string();
+    let local = projects.iter().find(|p| p.id == req.project).cloned();
     let mut ctx = Ctx {
         conn,
         spec,
         project: req.project,
-        warnings: Vec::new(),
+        warnings,
     };
     let mut folders = Vec::new();
     match req.direction {
@@ -146,7 +162,7 @@ pub async fn prepare(
                     Some(p) => p,
                     None => match default_path(
                         &settings.projects_folder,
-                        &shared.projects.read().await,
+                        &projects,
                         req.project,
                         &info.name,
                         rf.id,
@@ -185,6 +201,7 @@ pub async fn prepare(
         request: req,
         folders,
         warnings: ctx.warnings,
+        link,
     })
 }
 
