@@ -247,14 +247,10 @@ fn required(text: &str, why: &str) -> Edit<String> {
     Ok(t.to_string())
 }
 
-/// Every paired computer uses the project name as a folder name, whatever
-/// system it runs, so names that break anywhere are refused here.
+/// A project's name is a label: anything but blank. Where another computer
+/// needs a folder named after it, `naming::project_folder_name` makes one.
 pub(crate) fn project_name(text: &str) -> Edit<String> {
-    let name = required(text, "Enter a name for the project.")?;
-    match crate::naming::name_problem("Project", &name) {
-        Some(why) => Err(format!("{why} Choose another name.")),
-        None => Ok(name),
-    }
+    required(text, "Enter a name for the project.")
 }
 
 fn usable_folder_name(path: &Path) -> Edit<String> {

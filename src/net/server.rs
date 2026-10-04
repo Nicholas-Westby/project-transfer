@@ -3,13 +3,12 @@
 use super::gate::{self, Refusal};
 use super::handlers::{self, Ctx, SessionState};
 use super::pair_server::{self, After, Caller};
-use super::{NetEvent, Shared, tls};
+use super::relay;
+use super::routes::{callback, refresh_address, refresh_via, relay_of};
+use super::status::{project_info, status};
+use super::{NetEvent, Shared, stored_peer, tls};
 use crate::address::is_local;
-use crate::model::{InstanceId, Peer, Permissions};
-use crate::protocol::{
-    PROTOCOL_VERSION, ProjectSummary, RemoteFolder, RemoteProject, Request, Response, read_msg,
-    read_msg_limited, write_msg,
-};
+use crate::protocol::{PROTOCOL_VERSION, Request, Response, read_msg, read_msg_limited, write_msg};
 use anyhow::Context;
 use std::net::SocketAddr;
 use std::sync::Arc;
@@ -100,6 +99,8 @@ pub(super) async fn session<S: AsyncRead + AsyncWrite + Unpin + Send>(
         name,
         version,
         port,
+        addrs,
+        via,
     } = first
     else {
         let reason = "Say hello first. Update Project Transfer on the other computer.";
@@ -122,7 +123,10 @@ pub(super) async fn session<S: AsyncRead + AsyncWrite + Unpin + Send>(
     if changed {
         return refuse(shared, stream, &name, &Refusal::identity_changed()).await;
     }
-    refresh_address(shared, id, &fingerprint, remote, port).await;
+    let callback = callback(remote, port, &addrs);
+    let via = relay_of(shared, id, via).await;
+    refresh_address(shared, id, &fingerprint, callback).await;
+    refresh_via(shared, id, &fingerprint, via).await;
     let (my_id, my_name) = {
         let s = shared.settings.read().await;
         (s.id, s.name.clone())
@@ -182,8 +186,8 @@ pub(super) async fn session<S: AsyncRead + AsyncWrite + Unpin + Send>(
                     id,
                     name: &name,
                     fingerprint: &fingerprint,
-                    remote,
-                    port,
+                    address: callback,
+                    via,
                 };
                 let after = pair_server::respond(
                     shared, pairing, stream, who, commitment, requested, offered,
@@ -199,7 +203,11 @@ pub(super) async fn session<S: AsyncRead + AsyncWrite + Unpin + Send>(
             }
             Request::Status => {
                 let allows = peer.map(|p| p.allows).unwrap_or_default();
-                write_msg(stream, &status(shared, allows).await).await?;
+                write_msg(stream, &status(shared, allows, id).await).await?;
+            }
+            Request::Relay { to } => {
+                let caller = peer.context("the gate let an unpaired peer through")?;
+                return relay::relay(shared, stream, &caller, to).await;
             }
             Request::ProjectInfo { project } => {
                 write_msg(stream, &project_info(shared, project).await).await?;
@@ -217,40 +225,9 @@ pub(super) async fn session<S: AsyncRead + AsyncWrite + Unpin + Send>(
     }
 }
 
-/// A paired peer calling us shows where it is now; keeping that makes the
-/// stored address follow it when its IP or port changes.
-async fn refresh_address(
-    shared: &Shared,
-    id: InstanceId,
-    fingerprint: &str,
-    remote: SocketAddr,
-    port: u16,
-) {
-    if port == 0 {
-        return;
-    }
-    let addr = SocketAddr::new(remote.ip(), port);
-    let known = stored_peer(shared, id, fingerprint)
-        .await
-        .is_some_and(|p| p.last_address != Some(addr));
-    if known && let Err(e) = super::set_last_address(shared, id, fingerprint, addr).await {
-        warn!("could not save the new address of {id}: {e:#}");
-    }
-}
-
 fn is_eof(e: &anyhow::Error) -> bool {
     e.downcast_ref::<std::io::Error>()
         .is_some_and(|io| io.kind() == std::io::ErrorKind::UnexpectedEof)
-}
-
-async fn stored_peer(shared: &Shared, id: InstanceId, fingerprint: &str) -> Option<Peer> {
-    shared
-        .peers
-        .read()
-        .await
-        .iter()
-        .find(|p| p.id == id && p.fingerprint == fingerprint)
-        .cloned()
 }
 
 /// Answers the asker with the reason worded for it, and tells this
@@ -271,41 +248,6 @@ pub(super) async fn refuse<S: AsyncWrite + Unpin>(
         reason: refusal.theirs.clone(),
     };
     write_msg(stream, &reply).await
-}
-
-async fn status(shared: &Shared, allows: Permissions) -> Response {
-    let projects = shared
-        .projects
-        .read()
-        .await
-        .iter()
-        .map(|p| ProjectSummary {
-            id: p.id,
-            name: p.name.clone(),
-        })
-        .collect();
-    Response::Status { allows, projects }
-}
-
-async fn project_info(shared: &Shared, project: crate::model::ProjectId) -> Response {
-    let projects = shared.projects.read().await;
-    let info = projects
-        .iter()
-        .find(|p| p.id == project)
-        .map(|p| RemoteProject {
-            name: p.name.clone(),
-            primary: p.primary,
-            folders: p
-                .folders
-                .iter()
-                .map(|f| RemoteFolder {
-                    id: f.id,
-                    name: f.name.clone(),
-                    path: f.local_path.as_ref().map(|l| l.display().to_string()),
-                })
-                .collect(),
-        });
-    Response::ProjectInfo(info)
 }
 
 #[cfg(test)]

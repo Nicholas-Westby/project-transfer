@@ -1,0 +1,4 @@
+#!/bin/sh
+# Every commit carries the next version number. Turned on per clone with
+# `cargo xtask hooks`; the work is done in xtask/src/version.rs.
+exec cargo xtask bump-version

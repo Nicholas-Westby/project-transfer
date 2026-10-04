@@ -91,6 +91,12 @@ pub fn all(dir: &Path) {
         super::open_computers(h);
         fixed_address(h);
     });
+    let f = FakeBackend::seeded();
+    f.update(super::with_relay);
+    shot(dir, "09b-computers-through", f, |h| {
+        super::open_computers(h);
+        fixed_address(h);
+    });
     shot(dir, "10-pair-setup", FakeBackend::seeded(), |h| {
         super::open_computers(h);
         h.get_by_label("Pair").click_accesskit();

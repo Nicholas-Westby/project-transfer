@@ -18,10 +18,9 @@ pub fn now_ms() -> i64 {
 }
 
 /// Fails with a sentence for the preview when the computer that receives the
-/// files could not hold the project's or a folder's name. Checked whether or
-/// not the project has several folders, so a later folder never trips on it.
+/// files could not hold a folder's name. The project's own name is a label;
+/// `default_path` makes a folder name from it when it needs one.
 pub fn check_names_for(
-    project: &str,
     folders: &[&str],
     dest: crate::model::Os,
     computer: &str,
@@ -37,9 +36,6 @@ pub fn check_names_for(
         }
         _ => None,
     };
-    if let Some(why) = unusable("Project", project) {
-        anyhow::bail!("{why} {computer} can't hold it. Rename the project, then preview again.");
-    }
     for f in folders {
         if let Some(why) = unusable("Folder", f) {
             anyhow::bail!(
@@ -82,9 +78,9 @@ pub fn default_path(
     ids.insert(folder);
     validate_name(folder_name)?;
     let multi = incoming_multi || ids.len() > 1;
+    let holder = crate::naming::project_folder_name(project_name);
     let (top, rest) = if multi {
-        validate_name(project_name)?;
-        (project_name, Some(folder_name))
+        (holder.as_str(), Some(folder_name))
     } else {
         (folder_name, None)
     };

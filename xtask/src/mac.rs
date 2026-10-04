@@ -1,6 +1,6 @@
 //! macOS installer: builds Project Transfer.app and puts it in Applications.
 
-use crate::{app_version, build_number, build_release, icon, run};
+use crate::{app_version, build_release, icon, run};
 use anyhow::{Context, Result, bail};
 use std::path::{Path, PathBuf};
 use std::process::Command;
@@ -30,7 +30,9 @@ pub fn iconset_entries() -> Vec<(String, u32)> {
     entries
 }
 
-pub fn info_plist(version: &str, build: &str) -> String {
+/// Both version keys get the app version: it counts up with every commit,
+/// so it serves as the build number too.
+pub fn info_plist(version: &str) -> String {
     format!(
         r#"<?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
@@ -51,7 +53,7 @@ pub fn info_plist(version: &str, build: &str) -> String {
 	<key>CFBundleShortVersionString</key>
 	<string>{version}</string>
 	<key>CFBundleVersion</key>
-	<string>{build}</string>
+	<string>{version}</string>
 	<key>LSMinimumSystemVersion</key>
 	<string>12.0</string>
 	<key>NSPrincipalClass</key>
@@ -132,7 +134,7 @@ pub fn install(root: &Path, dest: Option<PathBuf>) -> Result<()> {
     let _ = std::fs::remove_dir_all(&scratch.0);
     std::fs::create_dir_all(&scratch.0)?;
     let staged = scratch.0.join(APP_NAME);
-    make_bundle(root, &staged, &exe, &version, &build_number(root))?;
+    make_bundle(root, &staged, &exe, &version)?;
 
     // Copy into a hidden folder inside the destination and verify there, so
     // the old copy is untouched until the new one is known to be whole.
@@ -165,12 +167,12 @@ fn make_hidden_dir(dest: &Path) -> Result<PathBuf> {
     bail!("could not create a temporary folder in {}", dest.display())
 }
 
-fn make_bundle(root: &Path, app: &Path, exe: &Path, version: &str, build: &str) -> Result<()> {
+fn make_bundle(root: &Path, app: &Path, exe: &Path, version: &str) -> Result<()> {
     let contents = app.join("Contents");
     let (macos, resources) = (contents.join("MacOS"), contents.join("Resources"));
     std::fs::create_dir_all(&macos)?;
     std::fs::create_dir_all(&resources)?;
-    std::fs::write(contents.join("Info.plist"), info_plist(version, build))?;
+    std::fs::write(contents.join("Info.plist"), info_plist(version))?;
     std::fs::write(contents.join("PkgInfo"), "APPL????")?;
     run(Command::new("plutil")
         .args(["-lint", "-s"])
@@ -309,11 +311,11 @@ mod tests {
 
     #[test]
     fn plist_has_required_keys() {
-        let p = info_plist("1.2.3", "42");
+        let p = info_plist("1.2.3");
         for needle in [
             "<string>local.project-transfer</string>",
             "<key>CFBundleShortVersionString</key>\n\t<string>1.2.3</string>",
-            "<key>CFBundleVersion</key>\n\t<string>42</string>",
+            "<key>CFBundleVersion</key>\n\t<string>1.2.3</string>",
             "<key>LSMinimumSystemVersion</key>\n\t<string>12.0</string>",
             "<key>NSLocalNetworkUsageDescription</key>\n\t<string>Project Transfer finds and connects to its copies on other computers on your local network.</string>",
             "<array>\n\t\t<string>_projtransfer._tcp</string>",

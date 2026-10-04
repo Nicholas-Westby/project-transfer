@@ -13,6 +13,7 @@ use std::collections::HashMap;
 use std::net::SocketAddr;
 use std::path::PathBuf;
 use tokio::io::{AsyncRead, AsyncWrite};
+use tracing::info;
 
 mod pull;
 mod push;
@@ -155,6 +156,14 @@ async fn manifest(
         Ok(Err(e)) => return refused(format!("Could not read {}: {e:#}", root.display())),
         Err(e) => return refused(format!("Scanning {} stopped: {e}", root.display())),
     };
+    // A preview the other computer shows is built from this; say what it saw.
+    info!(
+        "{} looked at {} for a preview: {} entries{}",
+        ctx.peer.name,
+        root.display(),
+        manifest.entries.len(),
+        if set_up { "" } else { ", not set up here yet" }
+    );
     state.roots.insert((project, folder), root.clone());
     Response::Manifest(FolderScan {
         manifest,

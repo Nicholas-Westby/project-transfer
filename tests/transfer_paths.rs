@@ -172,29 +172,21 @@ async fn a_new_folder_on_a_known_project_gets_the_default_path() {
 }
 
 #[tokio::test]
-async fn a_project_name_the_receiver_cannot_hold_stops_the_preview() {
+async fn a_project_name_is_a_label_not_a_folder_name() {
     let (a, b) = pair_full().await;
-    let src = a.project_dir("app");
-    write(&src, "a.txt", "a");
-    // Older data can hold a name the editor now refuses.
-    let mut p = a.add_project("Garden", &[("app", &src)]).await;
-    p.name = "orchard/beds".into();
+    let (app, docs) = (a.project_dir("app"), a.project_dir("docs"));
+    write(&app, "a.txt", "a");
+    write(&docs, "d", "d");
+    let mut p = a
+        .add_project("Garden", &[("app", &app), ("docs", &docs)])
+        .await;
+    p.name = "What: Next?".into();
     a.put_project(p.clone()).await;
-    let mut conn = a.open(&b).await;
-    let err = transfer::prepare(
-        &mut conn,
-        &a.shared,
-        a.request(&b, p.id, Direction::Push).await,
-    )
-    .await
-    .unwrap_err()
-    .to_string();
-    assert!(err.contains("Project names can't contain / or \\"), "{err}");
-    assert!(
-        err.contains("Rename the project, then preview again."),
-        "{err}"
-    );
-    assert!(!b.dev().join("app").exists());
+    let preview = push(&a, &b, p.id, false).await.0;
+    assert!(preview.warnings.is_empty(), "{:?}", preview.warnings);
+    let on_b = b.project(p.id).await.unwrap();
+    assert_eq!(on_b.name, "What: Next?");
+    assert_eq!(read(&b.dev().join("What Next/app"), "a.txt"), "a");
 }
 
 // Only unix file systems allow a backslash in a name.

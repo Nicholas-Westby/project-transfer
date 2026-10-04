@@ -132,7 +132,9 @@ pub async fn pair_finish(
         fingerprint: conn.peer_fingerprint.clone(),
         allows: started.offered,
         granted,
-        last_address: Some(conn.addr),
+        // A relay's address would reach the relay, never this peer.
+        last_address: conn.via.is_none().then_some(conn.addr),
+        via: conn.via,
     };
     remember(shared, peer.clone())
         .await

@@ -141,6 +141,7 @@ fn ready(ui: &mut Ui, p: &Preview, peer: &str) -> Option<bool> {
             Direction::Pull => format!("Nothing to pull. This computer already matches {peer}."),
         };
         widgets::muted(ui, what);
+        preview_view::folder_lines(ui, p);
         for w in preview::warnings(p, peer) {
             ui.label(preview_view::ticks(&w, pal.changed));
         }

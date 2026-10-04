@@ -3,18 +3,31 @@
 use crate::identity::Identity;
 use crate::model::{InstanceId, InstanceSettings, Peer, Permissions, Project, ProjectId};
 use crate::store::Store;
+use std::collections::HashMap;
+use std::net::SocketAddr;
 use std::sync::Arc;
 use tokio::sync::RwLock;
 
 mod client;
 mod gate;
 mod handlers;
+mod handshake;
 mod pair_client;
 mod pair_server;
+mod relay;
+mod routes;
 mod server;
+mod status;
 mod tls;
 
-pub use client::Connection;
+#[cfg(test)]
+mod hello_tests;
+#[cfg(test)]
+mod test_support;
+#[cfg(test)]
+mod through_tests;
+
+pub use client::{Connection, NotThePairedComputer};
 pub use gate::may_ask;
 pub use pair_client::{PairStarted, pair_finish, pair_start};
 pub use server::serve;
@@ -28,6 +41,13 @@ pub struct Shared {
     pub store: Arc<Store>,
     pub identity: Arc<Identity>,
     pub events: tokio::sync::mpsc::UnboundedSender<NetEvent>,
+    /// Where this computer sees other instances right now, from discovery
+    /// and Add by address; passing a connection along tries these first.
+    /// Anyone on the network can announce any address, so the relay checks
+    /// who answers before using one. Never holds a computer learned of
+    /// through a relay, or this computer would offer to pass connections to
+    /// one it can't reach itself.
+    pub found: Arc<RwLock<HashMap<InstanceId, Vec<SocketAddr>>>>,
 }
 
 #[derive(Debug)]
@@ -73,13 +93,13 @@ async fn remember(shared: &Shared, peer: Peer) -> anyhow::Result<()> {
     Ok(())
 }
 
-/// Changes only the stored address of a paired peer, under the write lock, so
-/// a permission change made meanwhile is never overwritten with an old copy.
-async fn set_last_address(
+/// Changes one paired peer under the write lock, so a permission change made
+/// meanwhile is never overwritten with an old copy.
+async fn update_peer(
     shared: &Shared,
     id: InstanceId,
     fingerprint: &str,
-    addr: std::net::SocketAddr,
+    change: impl FnOnce(&mut Peer),
 ) -> anyhow::Result<()> {
     let mut peers = shared.peers.write().await;
     let mut next = peers.clone();
@@ -89,8 +109,19 @@ async fn set_last_address(
     else {
         return Ok(());
     };
-    p.last_address = Some(addr);
+    change(p);
     shared.store.save_peers(&next)?;
     *peers = next;
     Ok(())
+}
+
+/// The paired peer with both this id and this certificate.
+async fn stored_peer(shared: &Shared, id: InstanceId, fingerprint: &str) -> Option<Peer> {
+    shared
+        .peers
+        .read()
+        .await
+        .iter()
+        .find(|p| p.id == id && p.fingerprint == fingerprint)
+        .cloned()
 }

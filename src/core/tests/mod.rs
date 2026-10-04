@@ -1,8 +1,12 @@
 use super::*;
 use std::path::Path;
 
+mod found;
 mod general;
+mod listed;
+mod paired;
 mod projects;
+mod reach;
 
 use std::time::{Duration, Instant};
 
@@ -74,4 +78,29 @@ pub(super) fn wait_until(core: &AppCore, what: &str, f: impl Fn(&UiState) -> boo
         std::thread::sleep(Duration::from_millis(20));
     }
     panic!("timed out waiting for {what}: {:#?}", core.state().activity);
+}
+
+#[derive(Clone)]
+pub(super) struct Capture(std::sync::Arc<std::sync::Mutex<Vec<u8>>>);
+
+impl std::io::Write for Capture {
+    fn write(&mut self, b: &[u8]) -> std::io::Result<usize> {
+        self.0.lock().unwrap().extend_from_slice(b);
+        Ok(b.len())
+    }
+    fn flush(&mut self) -> std::io::Result<()> {
+        Ok(())
+    }
+}
+
+/// What `f` writes to the log while it runs on this thread.
+pub(super) fn logged(f: impl FnOnce()) -> String {
+    let log = Capture(Default::default());
+    let sink = log.clone();
+    let subscriber = tracing_subscriber::fmt()
+        .with_writer(move || sink.clone())
+        .with_ansi(false)
+        .finish();
+    tracing::subscriber::with_default(subscriber, f);
+    String::from_utf8(log.0.lock().unwrap().clone()).unwrap()
 }

@@ -4,9 +4,12 @@
 //! never waits for it.
 
 mod actions;
+mod found;
 mod pairing;
 mod peers;
+mod poll;
 mod projects;
+mod reach;
 mod runs;
 mod settings;
 mod state;
@@ -25,7 +28,7 @@ use crate::address::DEFAULT_PORT;
 use crate::commands::Running;
 use crate::discovery::Discovery;
 use crate::identity::Identity;
-use crate::model::CommandId;
+use crate::model::{CommandId, InstanceId};
 use crate::net::{NetEvent, Shared};
 use crate::store::Store;
 use anyhow::Context;
@@ -80,6 +83,8 @@ struct Core {
     transfer: Arc<Mutex<transfers::Slot>>,
     runs: Arc<Mutex<HashMap<CommandId, Running>>>,
     poll_now: Arc<Notify>,
+    /// The last poll failure shown per peer, so it is said once.
+    poll_problems: Arc<Mutex<HashMap<InstanceId, String>>>,
 }
 
 /// A panic in one task must not wedge every other user of the lock.
@@ -134,6 +139,7 @@ impl AppCore {
             store: Arc::new(store),
             identity: Arc::new(identity),
             events,
+            found: Default::default(),
         };
         let core = Core {
             shared: shared.clone(),
@@ -144,6 +150,7 @@ impl AppCore {
             transfer: Arc::new(Mutex::new(transfers::Slot::default())),
             runs: Arc::new(Mutex::new(HashMap::new())),
             poll_now: Arc::new(Notify::new()),
+            poll_problems: Arc::new(Mutex::new(HashMap::new())),
         };
 
         let server_ui = ui.clone();

@@ -61,6 +61,7 @@ async fn start(answer: Option<Option<Permissions>>) -> Instance {
         store: Arc::new(store),
         identity: Arc::new(identity),
         events: tx,
+        found: Default::default(),
     };
     let codes = Arc::new(Mutex::new(Vec::new()));
     let refusals = Arc::new(Mutex::new(Vec::new()));

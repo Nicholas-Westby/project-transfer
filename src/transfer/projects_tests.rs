@@ -31,7 +31,8 @@ fn default_path_single_and_multi() {
         Path::new("/dev/Garden/app")
     );
     assert!(d("Garden", "..", false).is_err());
-    assert!(d("../x", "app", true).is_err());
+    // A project name is a label; the folder made from it stays put.
+    assert_eq!(d("../x", "app", true).unwrap(), Path::new("/dev/.. x/app"));
 }
 
 #[test]
@@ -103,19 +104,25 @@ fn wire_forms_drop_local_state() {
 #[test]
 fn names_are_checked_for_the_receiving_system() {
     use crate::model::Os;
-    assert!(check_names_for("Garden", &["app"], Os::Windows, "Desk").is_ok());
-    let err = check_names_for("CON", &["app"], Os::Windows, "Desk").unwrap_err();
+    assert!(check_names_for(&["app"], Os::Windows, "Desk").is_ok());
+    let err = check_names_for(&["CON"], Os::Windows, "Desk").unwrap_err();
     let err = err.to_string();
     assert!(
         err.contains("reserved name on Windows") && err.contains("Desk can't hold it"),
         "{err}"
     );
     // A Mac holds "CON" and "notes:old" fine, but no system holds a slash.
-    assert!(check_names_for("CON", &["notes:old"], Os::MacOs, "Desk").is_ok());
-    assert!(check_names_for("a/b", &["app"], Os::MacOs, "Desk").is_err());
+    assert!(check_names_for(&["CON", "notes:old"], Os::MacOs, "Desk").is_ok());
+    assert!(check_names_for(&["a/b"], Os::MacOs, "Desk").is_err());
     // The name is checked as stored; a trailing space is not trimmed away.
-    assert!(check_names_for("Garden", &["app "], Os::Windows, "Desk").is_err());
-    assert!(check_names_for("Garden ", &["app"], Os::Windows, "Desk").is_err());
-    let err = check_names_for("Garden", &["a?"], Os::Windows, "Desk").unwrap_err();
+    assert!(check_names_for(&["app "], Os::Windows, "Desk").is_err());
+    let err = check_names_for(&["a?"], Os::Windows, "Desk").unwrap_err();
     assert!(err.to_string().contains("Remove the folder"), "{err}");
+}
+
+#[test]
+fn a_project_with_several_folders_lands_in_a_folder_named_after_it() {
+    let (pid, id) = (uuid::Uuid::new_v4(), uuid::Uuid::new_v4());
+    let d = default_path(Path::new("/dev"), &[], pid, "What Next?", id, "app", true).unwrap();
+    assert_eq!(d, Path::new("/dev/What Next/app"));
 }

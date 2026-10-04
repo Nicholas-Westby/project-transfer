@@ -13,6 +13,7 @@ fn peer(push: bool, pull: bool) -> Peer {
         },
         granted: Permissions::default(),
         last_address: None,
+        via: None,
     }
 }
 
@@ -40,6 +41,8 @@ fn all_requests() -> Vec<(Request, Need)> {
                 name: "x".into(),
                 version: 1,
                 port: 0,
+                addrs: vec![],
+                via: None,
             },
             Need::Nothing,
         ),
@@ -54,6 +57,7 @@ fn all_requests() -> Vec<(Request, Need)> {
         (R::PairReveal { nonce: "00".into() }, Need::Nothing),
         (R::PairFinal { confirmed: true }, Need::Nothing),
         (R::Status, Need::Paired),
+        (R::Relay { to: u() }, Need::Paired),
         (R::ProjectInfo { project: u() }, Need::PullOrPush),
         (
             R::Manifest {
@@ -254,4 +258,11 @@ fn every_request_has_its_own_name_for_the_log() {
         assert!(format!("{req:?}").starts_with(req.kind()), "{req:?}");
         assert!(seen.insert(req.kind()), "{} named twice", req.kind());
     }
+}
+
+#[test]
+fn a_relay_request_needs_a_pairing_and_is_logged_by_name() {
+    let relay = Request::Relay { to: u() };
+    assert_eq!(need(&relay), Need::Paired);
+    assert_eq!(relay.kind(), "Relay");
 }

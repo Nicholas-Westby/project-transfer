@@ -15,6 +15,9 @@ pub struct Discovered {
     pub name: String,
     pub addrs: Vec<SocketAddr>,
     pub version: u32,
+    /// The paired computer that reported it, when this one can't see it
+    /// on the network itself.
+    pub via: Option<InstanceId>,
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -44,12 +47,20 @@ pub fn parse_txt(
     let name = get("name")?;
     let version: u32 = get("v")?.parse().ok()?;
     // Anything on the multicast segment can claim to be a peer; only keep
-    // addresses we would be willing to connect to.
-    let addrs: Vec<SocketAddr> = ips
+    // addresses we would be willing to connect to. A link-local IPv6 address
+    // means nothing without the interface it belongs to, and a Mac announces
+    // its loopback's fe80::1 too, so those only cost failed attempts.
+    let mut addrs: Vec<SocketAddr> = ips
         .into_iter()
         .filter(|ip| is_local(*ip))
+        .filter(|ip| !matches!(ip, IpAddr::V6(v6) if v6.is_unicast_link_local()))
         .map(|ip| SocketAddr::new(ip, port))
         .collect();
+    // Connecting tries these in order, and IPv4 (which sorts first) is what
+    // home networks route most reliably. A fixed order also lets a repeated
+    // announcement compare equal to the last one.
+    addrs.sort();
+    addrs.dedup();
     if addrs.is_empty() {
         return None;
     }
@@ -58,6 +69,7 @@ pub fn parse_txt(
         name,
         addrs,
         version,
+        via: None,
     })
 }
 
@@ -189,6 +201,29 @@ mod tests {
         let d = parse(InstanceId::new_v4(), &m, &["8.8.8.8", "10.0.0.2"]).unwrap();
         assert_eq!(d.addrs, vec!["10.0.0.2:4000".parse().unwrap()]);
         assert!(parse(InstanceId::new_v4(), &m, &["8.8.8.8"]).is_none());
+    }
+
+    /// What a Mac announced on a real network: the loopback's fe80::1 and
+    /// link-local addresses that mean nothing without their interface.
+    #[test]
+    fn keeps_only_addresses_another_computer_can_dial_ipv4_first() {
+        let other = InstanceId::new_v4().to_string();
+        let m = txt(&other, "Mac", "1");
+        let ips = [
+            "fe80::1",
+            "fe80::4721:9d4c:2f7a:b09c",
+            "fdb3:6408:73da:0:10ca:fc9e:86f1:b94d",
+            "192.168.12.145",
+        ];
+        let d = parse(InstanceId::new_v4(), &m, &ips).unwrap();
+        let want: Vec<SocketAddr> = vec![
+            "192.168.12.145:4000".parse().unwrap(),
+            "[fdb3:6408:73da:0:10ca:fc9e:86f1:b94d]:4000"
+                .parse()
+                .unwrap(),
+        ];
+        assert_eq!(d.addrs, want);
+        assert!(parse(InstanceId::new_v4(), &m, &["fe80::1"]).is_none());
     }
 
     #[test]

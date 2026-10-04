@@ -1,9 +1,8 @@
 //! This computer's own settings: name, Projects folder, theme, ignore list.
 
 use super::{Core, lock};
-use crate::discovery::{Discovery, DiscoveryEvent};
 use crate::ignore_rules::{IgnoreSpec, Matcher};
-use crate::model::{InstanceId, InstanceSettings, ThemeChoice};
+use crate::model::{InstanceSettings, ThemeChoice};
 use anyhow::{Context, bail};
 use std::path::PathBuf;
 
@@ -106,40 +105,5 @@ impl Core {
             let _ = child.wait();
         });
         Ok(())
-    }
-
-    /// mDNS is a convenience; without it "Add by address" still works.
-    pub(super) fn start_discovery(&self, name: &str, me: InstanceId, port: u16) {
-        let (tx, rx) = std::sync::mpsc::channel();
-        match Discovery::start(me, name, port, tx) {
-            Ok(d) => *lock(&self.discovery) = Some(d),
-            Err(e) => {
-                self.ui.warn(format!(
-                    "Could not look for other computers on this network ({e:#}). Use Add by \
-                     address instead."
-                ));
-                return;
-            }
-        }
-        let ui = self.ui.clone();
-        std::thread::spawn(move || {
-            while let Ok(ev) = rx.recv() {
-                ui.update(|s| match ev {
-                    DiscoveryEvent::Found(d) => {
-                        // mDNS resolves the same record repeatedly; log only news.
-                        let known = s.discovered.iter().find(|x| x.id == d.id);
-                        if known.is_none_or(|x| x.name != d.name) {
-                            tracing::info!("found {} ({}) at {:?}", d.name, d.id, d.addrs);
-                        }
-                        s.discovered.retain(|x| x.id != d.id);
-                        s.discovered.push(d);
-                    }
-                    DiscoveryEvent::Lost(id) => {
-                        tracing::info!("{id} left the network");
-                        s.discovered.retain(|x| x.id != id);
-                    }
-                });
-            }
-        });
     }
 }

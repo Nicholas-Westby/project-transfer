@@ -93,9 +93,9 @@ pub fn windows_problem(component: &str) -> Option<NameProblem> {
     None
 }
 
-/// Why `name` can't name a project or folder, which every paired computer
-/// uses as a folder name, or None when it can. `kind` is "Project" or
-/// "Folder", for the sentence; callers add what to do about it.
+/// Why `name` can't name a folder, which every paired computer uses as a
+/// folder name too, or None when it can. `kind` names the thing in the
+/// sentence; callers add what to do about it.
 pub fn name_problem(kind: &str, name: &str) -> Option<String> {
     if name.trim().is_empty() {
         return Some(format!("{kind} names can't be empty."));
@@ -128,6 +128,37 @@ pub fn name_problem(kind: &str, name: &str) -> Option<String> {
         NameProblem::CaseCollision(_) => return None,
     };
     Some(format!("{kind} name `{name}` can't be used: {why}."))
+}
+
+/// The folder that holds a project's folders on a computer that has several
+/// of them. A project name is a label and may hold anything, so characters
+/// some system can't use in a folder name become spaces.
+pub fn project_folder_name(name: &str) -> String {
+    const MAX_CHARS: usize = 100;
+    let spaced: String = name
+        .chars()
+        .map(|c| {
+            let bad = matches!(c, '/' | '\\' | '<' | '>' | ':' | '"' | '|' | '?' | '*');
+            if bad || c.is_control() { ' ' } else { c }
+        })
+        .collect();
+    let joined: String = spaced
+        .split_whitespace()
+        .collect::<Vec<_>>()
+        .join(" ")
+        .chars()
+        .take(MAX_CHARS)
+        .collect();
+    let out = joined.trim_end_matches(['.', ' ']);
+    if out.is_empty() {
+        return "Project".to_string();
+    }
+    if windows_problem(out) == Some(NameProblem::ReservedOnWindows) {
+        // Windows reserves the part before the first dot, so mark that part.
+        let stem = out.find('.').unwrap_or(out.len());
+        return format!("{}_{}", &out[..stem], &out[stem..]);
+    }
+    out.to_string()
 }
 
 /// Windows and default macOS volumes are case-insensitive, so the first path
@@ -229,26 +260,46 @@ mod tests {
     }
 
     #[test]
-    fn project_names_that_break_on_another_computer_are_refused() {
+    fn folder_names_that_break_on_another_computer_are_refused() {
         for n in [
             "a/b", "a\\b", ".", "..", "CON", "nul.txt", "a:b", "a?", "end.",
         ] {
-            assert!(name_problem("Project", n).is_some(), "{n:?}");
+            assert!(name_problem("Folder", n).is_some(), "{n:?}");
         }
         // Callers check the name they will store, so spaces are not trimmed away.
-        assert!(name_problem("Project", "end ").is_some());
+        assert!(name_problem("Folder", "end ").is_some());
         assert!(name_problem("Folder", " lead").is_some());
-        let slash = name_problem("Project", "a/b").unwrap();
+        let slash = name_problem("Folder", "a/b").unwrap();
         assert!(
-            slash.starts_with("Project names can't contain / or \\"),
+            slash.starts_with("Folder names can't contain / or \\"),
             "{slash}"
         );
         let colon = name_problem("Folder", "a:b").unwrap();
         assert!(colon.contains("contains :"), "{colon}");
-        assert!(name_problem("Project", "  ").is_some());
+        assert!(name_problem("Folder", "  ").is_some());
         for n in ["My project", "garden-2", "über", ".github"] {
-            assert_eq!(name_problem("Project", n), None, "{n}");
+            assert_eq!(name_problem("Folder", n), None, "{n}");
         }
+    }
+
+    #[test]
+    fn any_project_name_gives_a_folder_name_every_system_can_hold() {
+        for (name, folder) in [
+            ("What Next?", "What Next"),
+            ("web/app", "web app"),
+            ("a: b|c", "a b c"),
+            ("  spaced   out  ", "spaced out"),
+            ("Ends with a dot.", "Ends with a dot"),
+            ("CON", "CON_"),
+            ("nul.txt", "nul_.txt"),
+            ("???", "Project"),
+            ("My project", "My project"),
+        ] {
+            assert_eq!(project_folder_name(name), folder, "{name:?}");
+            assert_eq!(name_problem("Folder", folder), None, "{folder:?}");
+        }
+        let long = project_folder_name(&"x".repeat(300));
+        assert_eq!(long.chars().count(), 100);
     }
 
     #[test]

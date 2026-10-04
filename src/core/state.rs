@@ -222,30 +222,34 @@ impl StateHandle {
     }
 
     fn activity(&self, kind: ActivityKind, text: String) {
-        match kind {
-            ActivityKind::Info => tracing::info!("{text}"),
-            ActivityKind::Warn => tracing::warn!("{text}"),
-            ActivityKind::Error => tracing::error!("{text}"),
-        }
         let line = ActivityLine {
             at_ms: crate::transfer::projects::now_ms(),
             text,
             kind,
         };
-        self.update(|s| {
+        let repeat = self.update(|s| {
             // A peer that keeps failing would otherwise fill the strip.
             if let Some(last) = s.activity.last_mut()
                 && last.text == line.text
                 && last.kind == line.kind
             {
                 last.at_ms = line.at_ms;
-                return;
+                return true;
             }
-            s.activity.push(line);
+            s.activity.push(line.clone());
             if s.activity.len() > ACTIVITY_CAP {
                 let extra = s.activity.len() - ACTIVITY_CAP;
                 s.activity.drain(..extra);
             }
+            false
         });
+        // ...and the log, which has no line to fold a repeat into.
+        if !repeat {
+            match kind {
+                ActivityKind::Info => tracing::info!("{}", line.text),
+                ActivityKind::Warn => tracing::warn!("{}", line.text),
+                ActivityKind::Error => tracing::error!("{}", line.text),
+            }
+        }
     }
 }

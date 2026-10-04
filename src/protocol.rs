@@ -6,9 +6,10 @@ use crate::model::{Command, FolderId, InstanceId, Os, Permissions, Project, Proj
 use anyhow::{Context, bail};
 use serde::{Deserialize, Serialize, de::DeserializeOwned};
 use std::collections::HashMap;
+use std::net::IpAddr;
 use tokio::io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt};
 
-pub const PROTOCOL_VERSION: u32 = 2;
+pub const PROTOCOL_VERSION: u32 = 3;
 const MAX_MSG: u32 = 64 * 1024 * 1024;
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
@@ -20,6 +21,16 @@ pub enum Request {
         /// The port this instance listens on; the connection's own source
         /// port is ephemeral, so the other side cannot call back on it.
         port: u16,
+        /// This instance's own addresses, so the other side remembers where
+        /// to call back only when the call came straight from one of them.
+        /// Defaults to none so an older version still parses and is told to
+        /// update.
+        #[serde(default)]
+        addrs: Vec<IpAddr>,
+        /// The paired computer passing this call along, if any: a hint at
+        /// how to reach the caller again.
+        #[serde(default)]
+        via: Option<InstanceId>,
     },
     /// Starts pairing. `commitment` is the hex SHA-256 of the initiator's
     /// nonce, sent before it sees the responder's. `requested` is what the
@@ -40,6 +51,12 @@ pub enum Request {
         confirmed: bool,
     },
     Status,
+    /// Asks the answering computer to pass this connection along to `to`,
+    /// another computer it is paired with. After `Ok`, the bytes both ways
+    /// are the caller's own session with `to`, copied untouched.
+    Relay {
+        to: InstanceId,
+    },
     ProjectInfo {
         project: ProjectId,
     },
@@ -119,6 +136,7 @@ impl Request {
             Request::PairReveal { .. } => "PairReveal",
             Request::PairFinal { .. } => "PairFinal",
             Request::Status => "Status",
+            Request::Relay { .. } => "Relay",
             Request::ProjectInfo { .. } => "ProjectInfo",
             Request::Manifest { .. } => "Manifest",
             Request::Hashes { .. } => "Hashes",
@@ -155,6 +173,10 @@ pub enum Response {
     Status {
         allows: Permissions,
         projects: Vec<ProjectSummary>,
+        /// The answering computer's other paired computers that it sees on
+        /// the network right now, and so can pass a connection along to.
+        #[serde(default)]
+        reachable: Vec<Reachable>,
     },
     ProjectInfo(Option<RemoteProject>),
     Manifest(FolderScan),
@@ -188,6 +210,12 @@ pub struct FolderScan {
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
 pub struct ProjectSummary {
     pub id: ProjectId,
+    pub name: String,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
+pub struct Reachable {
+    pub id: InstanceId,
     pub name: String,
 }
 
@@ -254,41 +282,5 @@ fn size(bytes: u32) -> String {
 }
 
 #[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[tokio::test]
-    async fn framing_round_trips() {
-        let (mut a, mut b) = tokio::io::duplex(1024);
-        let req = Request::PutFile {
-            rel: "a/b.txt".into(),
-            size: 3,
-            mtime_ms: 7,
-            exec: true,
-        };
-        write_msg(&mut a, &req).await.unwrap();
-        write_msg(&mut a, &Response::Ok).await.unwrap();
-        assert_eq!(read_msg::<_, Request>(&mut b).await.unwrap(), req);
-        assert_eq!(read_msg::<_, Response>(&mut b).await.unwrap(), Response::Ok);
-    }
-
-    #[tokio::test]
-    async fn limited_read_rejects_over_its_limit() {
-        let (mut a, mut b) = tokio::io::duplex(64);
-        a.write_all(&(64u32 * 1024 + 1).to_be_bytes())
-            .await
-            .unwrap();
-        let err = read_msg_limited::<_, Request>(&mut b, 64 * 1024)
-            .await
-            .unwrap_err();
-        assert!(err.to_string().contains("64 KiB"), "{err}");
-    }
-
-    #[tokio::test]
-    async fn oversize_length_is_rejected() {
-        let (mut a, mut b) = tokio::io::duplex(64);
-        a.write_all(&u32::MAX.to_be_bytes()).await.unwrap();
-        let err = read_msg::<_, Request>(&mut b).await.unwrap_err();
-        assert!(err.to_string().contains("64 MiB"));
-    }
-}
+#[path = "protocol_tests.rs"]
+mod tests;

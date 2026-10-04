@@ -10,17 +10,7 @@ use egui::{CollapsingHeader, Color32, FontId, RichText, TextFormat, Ui};
 /// Draws the body of a ready preview: folders, warnings, counts, lists.
 pub fn show(ui: &mut Ui, p: &Preview, peer: &str) {
     let pal = Palette::of(ui.ctx());
-    for f in &p.folders {
-        ui.horizontal_wrapped(|ui| {
-            ui.label(RichText::new(&f.name).strong().color(pal.ink));
-            ui.label(widgets::mono(&f.source_path).color(pal.muted()));
-            ui.label(RichText::new("→").color(pal.muted()));
-            ui.label(widgets::mono(&f.dest_path).color(pal.muted()));
-        });
-        if f.dest_will_be_created {
-            widgets::small_muted(ui, format!("{} will be created.", f.dest_path));
-        }
-    }
+    folder_lines(ui, p);
     let warnings = warnings(p, peer);
     if !warnings.is_empty() {
         ui.add_space(8.0);
@@ -122,4 +112,21 @@ pub fn ticks(text: &str, color: Color32) -> LayoutJob {
         job.append(part, 0.0, f);
     }
     job
+}
+
+/// Which folders a preview compares, each as name, source and destination,
+/// so even "nothing to do" says which copies matched.
+pub fn folder_lines(ui: &mut Ui, p: &Preview) {
+    let pal = Palette::of(ui.ctx());
+    for f in &p.folders {
+        ui.horizontal_wrapped(|ui| {
+            ui.label(RichText::new(&f.name).strong().color(pal.ink));
+            ui.label(widgets::mono(&f.source_path).color(pal.muted()));
+            ui.label(RichText::new("→").color(pal.muted()));
+            ui.label(widgets::mono(&f.dest_path).color(pal.muted()));
+        });
+        if f.dest_will_be_created {
+            widgets::small_muted(ui, format!("{} will be created.", f.dest_path));
+        }
+    }
 }

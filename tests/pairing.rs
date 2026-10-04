@@ -3,7 +3,7 @@
 mod pairing_support;
 
 use pairing_support::*;
-use project_transfer::net::Connection;
+use project_transfer::net::{Connection, NotThePairedComputer};
 use project_transfer::protocol::{Request, Response};
 
 #[tokio::test]
@@ -75,7 +75,9 @@ async fn paired_peer_gets_status_and_project_info() {
     b.shared.projects.write().await.push(p.clone());
     let mut conn = Connection::open(b.addr, &a.shared).await.unwrap();
     match conn.request(&Request::Status).await.unwrap() {
-        Response::Status { allows, projects } => {
+        Response::Status {
+            allows, projects, ..
+        } => {
             assert_eq!(allows, perms(false, true));
             assert_eq!(projects.len(), 1);
             assert_eq!(projects[0].id, p.id);
@@ -170,7 +172,13 @@ async fn open_peer_refuses_a_stranger_at_the_peers_address() {
         .err()
         .expect("must refuse");
     let msg = err.to_string();
-    assert!(msg.contains(&format!("is not {}", stored.name)), "{msg}");
+    assert!(msg.contains(&format!("{} isn't at", stored.name)), "{msg}");
+    assert!(
+        err.downcast_ref::<NotThePairedComputer>().is_some(),
+        "{err:?}"
+    );
+    // Declining to talk to the wrong computer is not turning someone away.
+    assert!(a.refusals.lock().unwrap().is_empty());
     // The id matches but the cert does not: still not the paired computer.
     let mut same_id = stored.clone();
     same_id.fingerprint = "00".repeat(32);
