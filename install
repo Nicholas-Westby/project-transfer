@@ -1,0 +1,14 @@
+#!/bin/sh
+# Builds Project Transfer and installs it in Applications. Any arguments go to
+# the installer, for example: ./install --dest ~/Desktop/test-install
+set -e
+
+# Double-clicking this in Finder starts it in the home folder.
+cd "$(dirname "$0")"
+
+if ! command -v cargo >/dev/null 2>&1; then
+    echo "Rust isn't installed. Install it from https://rustup.rs, then run ./install again." >&2
+    exit 1
+fi
+
+exec cargo xtask install "$@"

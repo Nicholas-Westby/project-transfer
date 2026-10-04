@@ -1,0 +1,145 @@
+//! This computer's own settings: name, Projects folder, theme, ignore list.
+
+use super::{Core, lock};
+use crate::discovery::{Discovery, DiscoveryEvent};
+use crate::ignore_rules::{IgnoreSpec, Matcher};
+use crate::model::{InstanceId, InstanceSettings, ThemeChoice};
+use anyhow::{Context, bail};
+use std::path::PathBuf;
+
+impl Core {
+    /// Saves before memory changes, so memory never claims what the disk lacks.
+    pub(super) async fn update_settings(
+        &self,
+        f: impl FnOnce(&mut InstanceSettings),
+    ) -> anyhow::Result<InstanceSettings> {
+        let mut guard = self.shared.settings.write().await;
+        let mut next = guard.clone();
+        f(&mut next);
+        self.shared
+            .store
+            .save_instance(&next)
+            .context("Could not save the settings")?;
+        *guard = next.clone();
+        let me = next.clone();
+        self.ui.update(|s| s.me = me);
+        Ok(next)
+    }
+
+    pub(super) async fn rename(&self, name: String) -> anyhow::Result<()> {
+        let name = name.trim().to_string();
+        if name.is_empty() {
+            bail!("Enter a name for this computer.");
+        }
+        let n = name.clone();
+        self.update_settings(|s| s.name = n).await?;
+        if let Some(d) = lock(&self.discovery).as_ref()
+            && let Err(e) = d.rename(&name)
+        {
+            self.ui.warn(format!(
+                "Renamed, but could not announce the new name on the network ({e:#}). Paired \
+                 computers see it after the next restart."
+            ));
+        }
+        self.ui.info(format!("This computer is now called {name}."));
+        Ok(())
+    }
+
+    pub(super) async fn set_projects_folder(&self, path: PathBuf) -> anyhow::Result<()> {
+        let shown = path.display().to_string();
+        self.update_settings(|s| s.projects_folder = path).await?;
+        self.ui.info(format!(
+            "Projects arriving from other computers now go to {shown}."
+        ));
+        Ok(())
+    }
+
+    pub(super) async fn set_theme(&self, theme: ThemeChoice) -> anyhow::Result<()> {
+        self.update_settings(|s| s.theme = theme).await?;
+        self.ui.info(match theme {
+            ThemeChoice::Dark => "Switched to the dark theme.",
+            ThemeChoice::Light => "Switched to the light theme.",
+            ThemeChoice::System => "The theme now follows the system setting.",
+        });
+        Ok(())
+    }
+
+    pub(super) async fn set_ignores(
+        &self,
+        extra: Vec<String>,
+        always_include: Vec<String>,
+        removed_defaults: Vec<String>,
+    ) -> anyhow::Result<()> {
+        let clean = |v: Vec<String>| -> Vec<String> {
+            v.into_iter()
+                .map(|p| p.trim().to_string())
+                .filter(|p| !p.is_empty())
+                .collect()
+        };
+        let mut candidate = self.shared.settings.read().await.clone();
+        candidate.extra_ignores = clean(extra);
+        candidate.always_include = clean(always_include);
+        candidate.removed_default_ignores = clean(removed_defaults);
+        if let Err(e) = Matcher::new(&IgnoreSpec::from_settings(&candidate)) {
+            bail!("The ignore list was not changed: {e:#}. Fix the pattern and try again.");
+        }
+        self.update_settings(|s| {
+            s.extra_ignores = candidate.extra_ignores;
+            s.always_include = candidate.always_include;
+            s.removed_default_ignores = candidate.removed_default_ignores;
+        })
+        .await?;
+        self.ui
+            .info("Updated the ignore list. It applies from the next transfer.");
+        Ok(())
+    }
+
+    pub(super) fn open_log_folder(&self) -> anyhow::Result<()> {
+        let dir = self.shared.store.logs_dir();
+        let opener = if cfg!(windows) { "explorer" } else { "open" };
+        let mut child = std::process::Command::new(opener)
+            .arg(&dir)
+            .spawn()
+            .with_context(|| format!("Could not open the log folder {}", dir.display()))?;
+        // Reaped off the runtime so the opener never lingers as a zombie.
+        std::thread::spawn(move || {
+            let _ = child.wait();
+        });
+        Ok(())
+    }
+
+    /// mDNS is a convenience; without it "Add by address" still works.
+    pub(super) fn start_discovery(&self, name: &str, me: InstanceId, port: u16) {
+        let (tx, rx) = std::sync::mpsc::channel();
+        match Discovery::start(me, name, port, tx) {
+            Ok(d) => *lock(&self.discovery) = Some(d),
+            Err(e) => {
+                self.ui.warn(format!(
+                    "Could not look for other computers on this network ({e:#}). Use Add by \
+                     address instead."
+                ));
+                return;
+            }
+        }
+        let ui = self.ui.clone();
+        std::thread::spawn(move || {
+            while let Ok(ev) = rx.recv() {
+                ui.update(|s| match ev {
+                    DiscoveryEvent::Found(d) => {
+                        // mDNS resolves the same record repeatedly; log only news.
+                        let known = s.discovered.iter().find(|x| x.id == d.id);
+                        if known.is_none_or(|x| x.name != d.name) {
+                            tracing::info!("found {} ({}) at {:?}", d.name, d.id, d.addrs);
+                        }
+                        s.discovered.retain(|x| x.id != d.id);
+                        s.discovered.push(d);
+                    }
+                    DiscoveryEvent::Lost(id) => {
+                        tracing::info!("{id} left the network");
+                        s.discovered.retain(|x| x.id != id);
+                    }
+                });
+            }
+        });
+    }
+}
