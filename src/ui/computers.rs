@@ -6,7 +6,7 @@ use super::theme::Palette;
 use super::widgets::{self, dot};
 use super::{App, Confirm, Sheet, dialogs};
 use crate::core::{Action, PeerView, UiState};
-use crate::model::Permissions;
+use crate::model::{InstanceId, Permissions};
 use crate::transfer::projects::now_ms;
 use egui::{Align, Key, Layout, RichText, ScrollArea, TextEdit, Ui};
 
@@ -66,7 +66,9 @@ impl App {
         for d in new {
             ui.horizontal(|ui| {
                 ui.label(RichText::new(&d.name).color(Palette::of(ui.ctx()).ink));
-                if let Some(a) = d.addrs.first() {
+                if let Some(relay) = d.via {
+                    widgets::small_muted(ui, format!("through {}", relay_name(s, relay)));
+                } else if let Some(a) = d.addrs.first() {
                     ui.label(
                         widgets::mono(a.to_string())
                             .small()
@@ -98,11 +100,11 @@ impl App {
         );
         for p in &s.peers {
             ui.add_space(8.0);
-            self.paired_row(ui, p);
+            self.paired_row(ui, s, p);
         }
     }
 
-    fn paired_row(&mut self, ui: &mut Ui, p: &PeerView) {
+    fn paired_row(&mut self, ui: &mut Ui, s: &UiState, p: &PeerView) {
         let pal = Palette::of(ui.ctx());
         let name = &p.peer.name;
         ui.horizontal(|ui| {
@@ -118,6 +120,10 @@ impl App {
         let old = p.peer.allows;
         let mut new = old;
         ui.indent(("allows", p.peer.id), |ui| {
+            if let Some(relay) = p.peer.via {
+                let line = format!("Reached through {}.", relay_name(s, relay));
+                widgets::small_muted(ui, line);
+            }
             ui.checkbox(
                 &mut new.may_push_to_me,
                 "Can push to this computer (overwrites files here)",
@@ -167,4 +173,11 @@ impl App {
             ui.add(egui::Label::new(RichText::new(e).color(pal.removed)).wrap());
         }
     }
+}
+
+/// The paired computer that passes connections along, by name. One no longer
+/// paired is known by its id only, which means nothing to a person.
+fn relay_name(s: &UiState, relay: InstanceId) -> String {
+    s.peer(relay)
+        .map_or_else(|| "another computer".into(), |p| p.peer.name.clone())
 }

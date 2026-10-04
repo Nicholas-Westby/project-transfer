@@ -11,6 +11,8 @@ pub use seed::{sample_preview, with_pair_prompt};
 use egui_kittest::Harness;
 use egui_kittest::kittest::Queryable;
 use project_transfer::core::{Action, AppCore, StartOptions, UiState};
+use project_transfer::discovery::Discovered;
+use project_transfer::protocol::PROTOCOL_VERSION;
 use project_transfer::store::Store;
 use project_transfer::ui::{App, Backend, FolderPicker};
 use std::net::{IpAddr, Ipv4Addr};
@@ -73,6 +75,20 @@ pub fn live(dir: &Path) -> (Arc<AppCore>, Harness<'static, App>) {
 
 pub fn ui_harness(fake: Arc<FakeBackend>) -> Harness<'static, App> {
     harness(fake)
+}
+
+/// Adds a computer listed through Desktop Swift Heron, which Laptop Quiet
+/// Finch is reached through too.
+pub fn with_relay(s: &mut UiState) {
+    let desktop = s.peers[0].peer.id;
+    s.discovered.push(Discovered {
+        id: uuid::Uuid::from_u128(5),
+        name: "Tower Calm Wren".into(),
+        addrs: vec![],
+        version: PROTOCOL_VERSION,
+        via: Some(desktop),
+    });
+    s.peers[1].peer.via = Some(desktop);
 }
 
 pub fn open_computers(h: &mut Harness<'static, App>) {

@@ -73,6 +73,19 @@ pub fn this_computer(port: u16) -> Vec<String> {
     shareable(ips, port)
 }
 
+/// Every local address of this computer, loopback included. A hello lists
+/// them so the other side can tell whether the call came straight from here.
+pub fn own_ips() -> Vec<IpAddr> {
+    if_addrs::get_if_addrs()
+        .map(|list| {
+            list.into_iter()
+                .map(|i| i.ip())
+                .filter(|ip| is_local(*ip))
+                .collect()
+        })
+        .unwrap_or_default()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -96,6 +109,13 @@ mod tests {
 
     fn ip(s: &str) -> IpAddr {
         s.parse().unwrap()
+    }
+
+    #[test]
+    fn this_computers_own_addresses_include_loopback_and_nothing_public() {
+        let own = own_ips();
+        assert!(own.contains(&ip("127.0.0.1")), "{own:?}");
+        assert!(own.iter().all(|a| is_local(*a)), "{own:?}");
     }
 
     #[test]

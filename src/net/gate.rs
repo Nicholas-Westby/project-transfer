@@ -53,7 +53,8 @@ pub fn need(req: &Request) -> Need {
         R::Hello { .. } | R::PairCommit { .. } | R::PairReveal { .. } | R::PairFinal { .. } => {
             Need::Nothing
         }
-        R::Status => Need::Paired,
+        // The relay itself checks that it is paired with the target too.
+        R::Status | R::Relay { .. } => Need::Paired,
         // A push preview reads the receiver's project and manifest, and
         // commands are exchanged on both push and pull.
         // Hashes too: a push preview hashes the receiver's copies.

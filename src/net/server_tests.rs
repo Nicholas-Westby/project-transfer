@@ -1,38 +1,6 @@
 use super::*;
-use crate::identity::Identity;
-use crate::model::InstanceSettings;
-use crate::store::Store;
-use tokio::sync::RwLock;
-
-fn shared(dir: &std::path::Path) -> (Shared, tokio::sync::mpsc::UnboundedReceiver<NetEvent>) {
-    let store = Store::open_at(dir.to_path_buf()).unwrap();
-    let identity = Identity::load_or_create(&store.identity_dir()).unwrap();
-    let settings = InstanceSettings {
-        id: uuid::Uuid::new_v4(),
-        name: "Desk".into(),
-        projects_folder: dir.join("Dev"),
-        extra_ignores: vec![],
-        always_include: vec![],
-        removed_default_ignores: vec![],
-        last_peer: None,
-        theme: Default::default(),
-        port: 0,
-    };
-    let (tx, rx) = tokio::sync::mpsc::unbounded_channel();
-    let s = Shared {
-        settings: Arc::new(RwLock::new(settings)),
-        peers: Arc::new(RwLock::new(vec![])),
-        projects: Arc::new(RwLock::new(vec![])),
-        store: Arc::new(store),
-        identity: Arc::new(identity),
-        events: tx,
-    };
-    (s, rx)
-}
-
-fn addr(s: &str) -> SocketAddr {
-    s.parse().unwrap()
-}
+use crate::model::{Peer, Permissions};
+use crate::net::test_support::{addr, shared};
 
 #[test]
 fn only_private_sources_are_accepted() {
@@ -91,6 +59,8 @@ async fn other_protocol_version_is_refused() {
         name: "Old".into(),
         version: PROTOCOL_VERSION + 1,
         port: 0,
+        addrs: vec![],
+        via: None,
     };
     write_msg(&mut client, &hello).await.unwrap();
     let resp: Response = read_msg(&mut client).await.unwrap();
@@ -121,6 +91,8 @@ async fn refused_put_file_closes_the_connection() {
         name: "X".into(),
         version: PROTOCOL_VERSION,
         port: 0,
+        addrs: vec![],
+        via: None,
     };
     write_msg(&mut client, &hello).await.unwrap();
     let _: Response = read_msg(&mut client).await.unwrap();
@@ -182,6 +154,8 @@ async fn unpaired_request_over_64_kib_closes_the_connection() {
         name: "X".into(),
         version: PROTOCOL_VERSION,
         port: 0,
+        addrs: vec![],
+        via: None,
     };
     write_msg(&mut client, &hello).await.unwrap();
     let _: Response = read_msg(&mut client).await.unwrap();
@@ -205,6 +179,7 @@ async fn paired_peer_may_send_large_messages() {
         },
         granted: Permissions::default(),
         last_address: None,
+        via: None,
     });
     let (mut client, mut server) = tokio::io::duplex(1024 * 1024);
     tokio::spawn(async move {
@@ -222,6 +197,8 @@ async fn paired_peer_may_send_large_messages() {
         name: "Laptop".into(),
         version: PROTOCOL_VERSION,
         port: 0,
+        addrs: vec![],
+        via: None,
     };
     write_msg(&mut client, &hello).await.unwrap();
     let _: Response = read_msg(&mut client).await.unwrap();
@@ -248,11 +225,12 @@ async fn refreshing_an_address_leaves_every_other_field_as_it_is() {
         allows: Permissions::default(),
         granted: Permissions::default(),
         last_address: None,
+        via: None,
     };
     s.peers.write().await.push(peer);
     // A permission change lands after the caller last looked at the peer.
     s.peers.write().await[0].allows.may_push_to_me = true;
-    refresh_address(&s, id, "ff", addr("127.0.0.1:5000"), 4242).await;
+    refresh_address(&s, id, "ff", Some(addr("127.0.0.1:4242"))).await;
     let live = s.peers.read().await[0].clone();
     assert_eq!(live.last_address, Some(addr("127.0.0.1:4242")));
     assert!(live.allows.may_push_to_me);
@@ -274,6 +252,7 @@ async fn a_refusal_is_worded_for_each_side() {
         allows: Permissions::default(),
         granted: Permissions::default(),
         last_address: None,
+        via: None,
     });
     let (mut client, mut server) = tokio::io::duplex(64 * 1024);
     tokio::spawn(async move {
@@ -291,6 +270,8 @@ async fn a_refusal_is_worded_for_each_side() {
         name: "Laptop".into(),
         version: PROTOCOL_VERSION,
         port: 0,
+        addrs: vec![],
+        via: None,
     };
     write_msg(&mut client, &hello).await.unwrap();
     let _: Response = read_msg(&mut client).await.unwrap();

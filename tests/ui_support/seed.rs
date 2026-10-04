@@ -49,6 +49,7 @@ pub fn seeded_state() -> UiState {
             allows: ALL,
             granted: ALL,
             last_address: None,
+            via: None,
         },
         online,
         address: None,
@@ -65,6 +66,7 @@ pub fn seeded_state() -> UiState {
         name: "Mini Brisk Lynx".into(),
         addrs: vec!["192.168.1.40:47820".parse().unwrap()],
         version: 1,
+        via: None,
     }];
 
     let hooks = Command {

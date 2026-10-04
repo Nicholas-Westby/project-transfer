@@ -1,14 +1,11 @@
-//! Pairing in both directions, adding a computer by address, and what the
-//! server reports.
+//! Pairing in both directions, and what the server reports.
 
+use super::reach::open_any;
 use super::state::{OutgoingPairView, PairPromptView, PairState, PromptState};
 use super::{Core, lock};
-use crate::address::parse_address;
 use crate::discovery::Discovered;
 use crate::model::Permissions;
-use crate::net::{Connection, NetEvent, pair_finish, pair_start};
-use crate::protocol::PROTOCOL_VERSION;
-use anyhow::{anyhow, bail};
+use crate::net::{NetEvent, pair_finish, pair_start};
 use std::sync::Arc;
 use tokio::sync::{Notify, oneshot};
 use tokio::task::AbortHandle;
@@ -180,41 +177,6 @@ impl Core {
         }
     }
 
-    pub(super) async fn add_by_address(self, text: String) {
-        let result = async {
-            let addr = parse_address(&text).map_err(|e| anyhow!(e))?;
-            let mut conn = Connection::open(addr, &self.shared).await?;
-            conn.close().await;
-            if conn.peer_id() == self.shared.settings.read().await.id {
-                bail!("{addr} is this computer. Enter the other computer's address.");
-            }
-            Ok(Discovered {
-                id: conn.peer_id(),
-                name: conn.peer_name().to_string(),
-                addrs: vec![addr],
-                version: PROTOCOL_VERSION,
-            })
-        }
-        .await;
-        match result {
-            Ok(d) => {
-                let text = format!("Found {} at {}.", d.name, d.addrs[0]);
-                self.ui.update(|s| {
-                    s.address_error = None;
-                    s.discovered.retain(|x| x.id != d.id);
-                    s.discovered.push(d);
-                });
-                self.ui.info(text);
-            }
-            Err(e) => {
-                let why = format!("{e:#}");
-                self.ui.update(|s| s.address_error = Some(why.clone()));
-                self.ui
-                    .error(format!("Could not add {}: {why}", text.trim()));
-            }
-        }
-    }
-
     pub(super) async fn net_event(&self, ev: NetEvent) {
         match ev {
             NetEvent::PairPrompt {
@@ -300,17 +262,6 @@ impl Core {
             NetEvent::Log(text) => self.ui.info(text),
         }
     }
-}
-
-async fn open_any(core: &Core, target: &Discovered) -> anyhow::Result<Connection> {
-    let mut last = None;
-    for addr in &target.addrs {
-        match Connection::open(*addr, &core.shared).await {
-            Ok(c) => return Ok(c),
-            Err(e) => last = Some(e),
-        }
-    }
-    Err(last.unwrap_or_else(|| anyhow!("{} has no address to connect to.", target.name)))
 }
 
 pub(super) fn files_word(n: u64) -> String {

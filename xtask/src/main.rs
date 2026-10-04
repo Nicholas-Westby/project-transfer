@@ -1,24 +1,29 @@
-//! Project tooling: `cargo xtask install` and `cargo xtask icon`.
+//! Project tooling: `cargo xtask install`, `icon`, `bump-version` and `hooks`.
 
 mod icon;
 mod mac;
+mod version;
 mod windows;
 
 use anyhow::{Context, Result, bail};
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
-const USAGE: &str = "usage: cargo xtask <command>\n\n  install [--dest <folder>]   build the app and install it\n  icon                        render assets/icon.png (and icon.ico)";
+const USAGE: &str = "usage: cargo xtask <command>\n\n  install [--dest <folder>]   build the app and install it\n  icon                        render assets/icon.png (and icon.ico)\n  bump-version                count the version up and stage it (the pre-commit hook runs this)\n  hooks                       turn on the pre-commit hook for this clone";
 
 #[derive(Debug, PartialEq)]
 enum Task {
     Install { dest: Option<PathBuf> },
     Icon,
+    BumpVersion,
+    Hooks,
 }
 
 fn parse_args(args: &[String]) -> Result<Task> {
     match args.first().map(String::as_str) {
         Some("icon") if args.len() == 1 => Ok(Task::Icon),
+        Some("bump-version") if args.len() == 1 => Ok(Task::BumpVersion),
+        Some("hooks") if args.len() == 1 => Ok(Task::Hooks),
         Some("install") => {
             let mut dest = None;
             let mut rest = args[1..].iter();
@@ -41,6 +46,16 @@ fn main() -> Result<()> {
     let args: Vec<String> = std::env::args().skip(1).collect();
     match parse_args(&args)? {
         Task::Icon => icon::render_files(&repo_root()),
+        Task::BumpVersion => {
+            let v = version::bump(&repo_root())?;
+            println!("Version {v}");
+            Ok(())
+        }
+        Task::Hooks => {
+            version::install_hooks(&repo_root())?;
+            println!("Every commit in this clone now counts the version up.");
+            Ok(())
+        }
         Task::Install { dest } => {
             // Resolve now: the installer changes nothing about the working
             // directory, but a relative path should mean the caller's.
@@ -119,20 +134,6 @@ fn app_version(root: &Path) -> Result<String> {
         .context("project-transfer is not in the workspace")
 }
 
-/// Commit count as the build number; 0 outside git.
-fn build_number(root: &Path) -> String {
-    Command::new("git")
-        .current_dir(root)
-        .args(["rev-list", "--count", "HEAD"])
-        .output()
-        .ok()
-        .filter(|o| o.status.success())
-        .and_then(|o| String::from_utf8(o.stdout).ok())
-        .map(|s| s.trim().to_owned())
-        .filter(|s| !s.is_empty() && s.chars().all(|c| c.is_ascii_digit()))
-        .unwrap_or_else(|| "0".into())
-}
-
 /// Runs a command, failing with its name when it exits non-zero.
 fn run(cmd: &mut Command) -> Result<()> {
     let name = format!("{:?}", cmd.get_program());
@@ -156,6 +157,11 @@ mod tests {
     #[test]
     fn parses_commands() {
         assert_eq!(parse_args(&args(&["icon"])).unwrap(), Task::Icon);
+        assert_eq!(
+            parse_args(&args(&["bump-version"])).unwrap(),
+            Task::BumpVersion
+        );
+        assert_eq!(parse_args(&args(&["hooks"])).unwrap(), Task::Hooks);
         assert_eq!(
             parse_args(&args(&["install"])).unwrap(),
             Task::Install { dest: None }

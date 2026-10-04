@@ -162,6 +162,7 @@ fn last_peer_is_selected_again_at_start_and_unpair_forgets_it() {
         allows: Default::default(),
         granted: Default::default(),
         last_address: None,
+        via: None,
     };
     store.save_peers(std::slice::from_ref(&peer)).unwrap();
     let mut me = store.load_or_create_instance().unwrap();
@@ -218,15 +219,18 @@ fn port_zero_tries_the_preferred_port_first() {
 }
 
 #[test]
-fn repeated_activity_is_folded_into_one_line() {
+fn repeated_activity_is_folded_into_one_line_and_logged_once() {
     let ui = StateHandle::new(
         UiState::new(Fixture::new().core.state().me.clone(), 1),
         None,
     );
-    ui.warn("Desk stopped answering.");
-    ui.warn("Desk stopped answering.");
-    ui.info("Desk stopped answering.");
+    let text = logged(|| {
+        ui.warn("Desk stopped answering.");
+        ui.warn("Desk stopped answering.");
+        ui.info("Desk stopped answering.");
+    });
     assert_eq!(ui.lock().activity.len(), 2);
+    assert_eq!(text.matches("Desk stopped answering.").count(), 2, "{text}");
 }
 
 #[test]

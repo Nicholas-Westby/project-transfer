@@ -111,14 +111,12 @@ impl App {
     }
 }
 
-/// Why the project can't be created as entered, for an inline error. A blank
-/// name only disables the button.
+/// Why the project can't be created as entered, for an inline error. Any
+/// name will do; a blank one only disables the button, so only the folder's
+/// name, which other computers use as a folder name, is checked.
 fn name_problem(name: &str, folder: &std::path::Path) -> Option<String> {
     if name.trim().is_empty() {
         return None;
-    }
-    if let Some(why) = crate::naming::name_problem("Project", name.trim()) {
-        return Some(format!("{why} Choose another name."));
     }
     crate::naming::name_problem("Folder", &folder_name(folder))
         .map(|why| format!("{why} Rename the folder on disk or choose another one."))
@@ -160,6 +158,7 @@ mod tests {
     fn a_trailing_space_while_typing_a_project_name_is_no_problem() {
         let folder = Path::new("/work/app");
         assert_eq!(name_problem("My ", folder), None);
+        assert_eq!(name_problem("What Next?", folder), None);
         // The folder name is used as it is on disk.
         assert!(name_problem("My", Path::new("/work/app ")).is_some());
     }

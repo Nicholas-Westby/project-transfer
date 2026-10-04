@@ -22,6 +22,8 @@ pub fn peer_status(p: &PeerView, now: i64) -> String {
     }
 }
 
+const VERSION: &str = concat!("v", env!("CARGO_PKG_VERSION"));
+
 impl App {
     pub(super) fn session_bar(&mut self, ui: &mut Ui, s: &UiState) {
         let pal = Palette::of(ui.ctx());
@@ -44,6 +46,10 @@ impl App {
                         if widgets::icon_button(ui, "⚙", "Settings").clicked() {
                             self.view.sheet = Sheet::Settings(settings::Draft::from(&s.me));
                         }
+                        // Counts up with every commit, so a screenshot says
+                        // which build is running.
+                        widgets::small_muted(ui, VERSION)
+                            .on_hover_text("The version of Project Transfer on this computer.");
                     });
                 });
             });
@@ -160,6 +166,7 @@ mod tests {
                 allows: Permissions::default(),
                 granted: Permissions::default(),
                 last_address: None,
+                via: None,
             },
             online,
             address: None,

@@ -69,10 +69,9 @@ async fn begin(
     folder: crate::model::FolderId,
     expected_path: &str,
 ) -> Response {
-    let names = std::iter::once(project.name.as_str())
-        .chain(project.folders.iter().map(|f| f.name.as_str()));
-    for name in names {
-        if let Err(reason) = validate_name(name) {
+    // Folder names become folder names here; the project's name is a label.
+    for f in &project.folders {
+        if let Err(reason) = validate_name(&f.name) {
             return refused(reason);
         }
     }

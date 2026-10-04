@@ -13,6 +13,7 @@ use crate::protocol::{FolderScan, Request, Response};
 use anyhow::{Context, bail};
 use std::collections::HashMap;
 use std::path::PathBuf;
+use tracing::info;
 
 /// Fails unless `conn` reaches the computer the request names.
 pub(super) fn check_peer(conn: &Connection, req: &TransferRequest) -> anyhow::Result<()> {
@@ -95,7 +96,7 @@ pub async fn prepare(
                 };
                 let remote = ctx.remote_scan(f.id, &f.name, &p.name, multi).await?;
                 let names: Vec<&str> = p.folders.iter().map(|f| f.name.as_str()).collect();
-                check_names_for(&p.name, &names, remote.os, &peer)?;
+                check_names_for(&names, remote.os, &peer)?;
                 if !remote.set_up && remote.exists && !remote.manifest.entries.is_empty() {
                     ctx.warnings.push(unclaimed(&remote.path, &peer));
                 }
@@ -126,7 +127,7 @@ pub async fn prepare(
                 other => return Err(unexpected(ctx.conn, "the project request", other)),
             };
             let names: Vec<&str> = info.folders.iter().map(|f| f.name.as_str()).collect();
-            check_names_for(&info.name, &names, Os::current(), "This computer")?;
+            check_names_for(&names, Os::current(), "This computer")?;
             let multi = info.folders.len() > 1;
             for rf in &info.folders {
                 let remote = ctx.remote_scan(rf.id, &rf.name, &info.name, multi).await?;
@@ -274,6 +275,15 @@ impl Ctx<'_> {
                 resolve_hashes(plan, &remote, &local)
             };
         }
+        info!(
+            "preview of {}: {} ({} entries) against {} ({} entries): {} changes",
+            s.name,
+            s.src.1,
+            src.entries.len(),
+            s.dst.1,
+            dst.entries.len(),
+            plan.changes.len()
+        );
         let (plan, skipped, case_clashes) = drop_unholdable(plan, src, dst, s.dest_os);
         let mut replaced = replaced_folders(&plan, dst);
         replaced.extend(case_clashes);

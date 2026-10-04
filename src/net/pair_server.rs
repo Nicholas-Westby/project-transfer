@@ -27,9 +27,12 @@ pub(super) struct Caller<'a> {
     pub id: InstanceId,
     pub name: &'a str,
     pub fingerprint: &'a str,
-    pub remote: SocketAddr,
-    /// The port the caller listens on, 0 if it did not say.
-    pub port: u16,
+    /// Where the caller listens, when its hello showed the call came straight
+    /// from it.
+    pub address: Option<SocketAddr>,
+    /// The paired computer that passed the call along, if this one is paired
+    /// with it too.
+    pub via: Option<InstanceId>,
 }
 
 /// Whether the connection stays open afterwards.
@@ -166,8 +169,8 @@ pub(super) async fn respond<S: AsyncRead + AsyncWrite + Unpin + Send>(
         fingerprint: who.fingerprint.to_string(),
         allows,
         granted: offered,
-        // The source port is ephemeral; only the advertised one is dialable.
-        last_address: (who.port != 0).then(|| SocketAddr::new(who.remote.ip(), who.port)),
+        last_address: who.address,
+        via: who.via,
     };
     if let Err(e) = remember(shared, peer.clone()).await {
         let me = shared.settings.read().await.name.clone();

@@ -86,14 +86,8 @@ impl App {
                 if ui.input(|i| i.key_pressed(Key::Escape)) {
                     return;
                 }
-                let problem = crate::naming::name_problem("Project", draft.trim())
-                    .filter(|_| !draft.trim().is_empty());
-                if let Some(why) = &problem {
-                    widgets::error_text(ui, &format!("{why} Choose another name."));
-                }
                 let done = ui.input(|i| i.key_pressed(Key::Enter)) || r.lost_focus();
-                // A name other computers can't use keeps the field open.
-                if done && problem.is_none() {
+                if done {
                     let name = draft.trim();
                     if !name.is_empty() && name != p.name {
                         self.act(Action::RenameProject(id, name.to_string()));

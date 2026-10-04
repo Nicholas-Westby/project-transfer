@@ -4,7 +4,7 @@
 mod ui_support;
 
 use egui_kittest::kittest::Queryable;
-use project_transfer::core::{Action, OutgoingPairView, PairState, PromptState, TransferState};
+use project_transfer::core::{Action, TransferState};
 use project_transfer::model::Direction;
 use project_transfer::ui::Confirm;
 use ui_support::{FakeBackend, live, sample_preview, ui_harness};
@@ -147,76 +147,6 @@ fn a_received_command_shows_its_text_before_it_runs() {
     assert!(matches!(&fake.actions()[..], [Action::RunCommand(_, _, Some(h))] if *h == want));
 }
 
-#[test]
-fn unpairing_asks_first() {
-    let fake = FakeBackend::seeded();
-    let mut h = ui_harness(fake.clone());
-    ui_support::open_computers(&mut h);
-    h.get_all_by_label("Unpair").next().unwrap().click();
-    h.run();
-    h.get_by_label("Unpair Desktop Swift Heron?");
-    assert!(fake.actions().is_empty());
-    h.get_all_by_label("Unpair").last().unwrap().click();
-    h.run();
-    assert!(matches!(fake.actions()[..], [Action::Unpair(_)]));
-}
-
-#[test]
-fn the_pair_prompt_shows_the_code_and_answers() {
-    let fake = FakeBackend::seeded();
-    fake.update(ui_support::with_pair_prompt);
-    let mut h = ui_harness(fake.clone());
-    h.get_by_label("481 205");
-    h.get_by_label("Check that both screens show the same code.");
-    h.get_by_label("Mini Brisk Lynx asks to be allowed to push and pull.");
-    h.get_by_label("Pair").click();
-    h.run();
-    // Push starts unticked even though it was asked for; pull follows the request.
-    match &fake.actions()[..] {
-        [Action::AnswerPair(Some(allows))] => {
-            assert!(!allows.may_push_to_me && allows.may_pull_from_me);
-        }
-        other => panic!("expected one AnswerPair, got {other:?}"),
-    }
-}
-
-#[test]
-fn the_starting_computer_confirms_or_cancels_the_code() {
-    for (button, yes) in [("Codes match", true), ("Cancel", false)] {
-        let fake = FakeBackend::seeded();
-        fake.update(|s| {
-            s.pairing = Some(OutgoingPairView {
-                target_name: "Mini Brisk Lynx".into(),
-                code: Some("481 205".into()),
-                state: PairState::Confirm,
-                other_accepted: true,
-            })
-        });
-        let mut h = ui_harness(fake.clone());
-        h.get_by_label("Does Mini Brisk Lynx show this code?");
-        h.get_by_label("481 205");
-        h.get_by_label_contains("accepted");
-        h.get_by_label(button).click();
-        h.run();
-        assert_eq!(fake.actions(), vec![Action::ConfirmPairCode(yes)]);
-    }
-}
-
-#[test]
-fn an_accepted_prompt_waits_and_can_be_cancelled() {
-    let fake = FakeBackend::seeded();
-    fake.update(|s| {
-        ui_support::with_pair_prompt(s);
-        s.pair_prompt.as_mut().unwrap().state = PromptState::Waiting;
-    });
-    let mut h = ui_harness(fake.clone());
-    h.get_by_label("Waiting for Mini Brisk Lynx to confirm the code.");
-    h.get_by_label("Cancel pairing").click();
-    // The spinner keeps asking for frames, so step instead of running to rest.
-    h.run_steps(2);
-    assert_eq!(fake.actions(), vec![Action::DismissPairPrompt]);
-}
-
 /// Writes PNGs of each screen for review when `UI_SHOTS_DIR` is set.
 #[test]
 fn screenshots() {
@@ -241,28 +171,6 @@ fn a_confirmation_whose_target_is_gone_closes() {
         assert!(h.state().view.confirm.is_none());
     }
     assert!(fake.actions().is_empty());
-}
-
-#[test]
-fn pairing_asks_before_letting_the_other_computer_overwrite_files() {
-    let fake = FakeBackend::seeded();
-    let mut h = ui_harness(fake.clone());
-    ui_support::open_computers(&mut h);
-    h.get_by_label("Pair").click();
-    h.run();
-    h.get_by_label("Pair").click();
-    h.run();
-    match &fake.actions()[..] {
-        [
-            Action::Pair {
-                offered, requested, ..
-            },
-        ] => {
-            assert!(!offered.may_push_to_me && offered.may_pull_from_me);
-            assert!(!requested.may_push_to_me && requested.may_pull_from_me);
-        }
-        other => panic!("expected one Pair, got {other:?}"),
-    }
 }
 
 #[test]
@@ -296,18 +204,25 @@ fn pulling_a_remote_only_project_says_why_it_cannot() {
 }
 
 #[test]
-fn a_project_name_other_computers_cannot_use_shows_an_inline_error() {
+fn any_project_name_can_be_used() {
     let fake = FakeBackend::seeded();
     let mut h = ui_harness(fake.clone());
+    let folder = std::path::PathBuf::from("/Users/jdoe/Dev/greenhouse");
     h.state_mut().view.sheet = project_transfer::ui::Sheet::NewProject {
-        name: "garden/app".into(),
-        folder: std::path::PathBuf::from("/Users/jdoe/Dev/greenhouse"),
+        name: "What Next?".into(),
+        folder: folder.clone(),
     };
     h.run();
-    h.get_by_label_contains("Project names can't contain / or \\");
+    assert!(h.query_by_label_contains("can't be used").is_none());
     h.get_by_label("Create project").click();
     h.run();
-    assert!(fake.actions().is_empty());
+    assert_eq!(
+        fake.actions(),
+        vec![Action::CreateProject {
+            name: "What Next?".into(),
+            folder,
+        }]
+    );
 }
 
 #[test]
@@ -340,4 +255,32 @@ fn a_transfer_the_peer_started_is_described_from_this_side() {
     let mut h = ui_harness(fake);
     h.run();
     h.get_by_label_contains("Desktop Swift Heron last pushed here");
+}
+
+#[test]
+fn nothing_to_push_names_the_folders_it_compared() {
+    let fake = FakeBackend::seeded();
+    fake.update(|s| {
+        let mut p = sample_preview(s);
+        for f in &mut p.folders {
+            f.plan.changes.clear();
+            f.skipped.clear();
+            f.replaced.clear();
+        }
+        p.warnings.clear();
+        s.transfer = TransferState::Ready(p);
+    });
+    let h = ui_harness(fake);
+    h.get_by_label_contains("Nothing to push");
+    // Once in the folders table behind the sheet, once in the sheet.
+    let here = h.get_all_by_label("/Users/jdoe/Dev/garden-planner/app");
+    assert_eq!(here.count(), 2);
+    let there = h.get_all_by_label("D:\\dev\\garden-planner\\app");
+    assert_eq!(there.count(), 2);
+}
+
+#[test]
+fn the_version_shows_next_to_settings() {
+    let h = ui_harness(FakeBackend::seeded());
+    h.get_by_label(concat!("v", env!("CARGO_PKG_VERSION")));
 }

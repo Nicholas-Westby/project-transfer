@@ -169,25 +169,12 @@ fn commands_are_added_edited_and_deleted_with_fresh_times() {
 }
 
 #[test]
-fn names_other_computers_could_not_use_are_refused() {
+fn project_names_are_free_but_folder_names_are_checked() {
     let f = Fixture::new();
-    f.act(Action::CreateProject {
-        name: "a/b".into(),
-        folder: f.folder("app"),
-    });
-    assert!(f.core.state().projects.is_empty());
-    let line = f.last_activity();
-    assert_eq!(line.kind, ActivityKind::Error);
-    assert!(
-        line.text.starts_with("Project names can't contain / or \\"),
-        "{}",
-        line.text
-    );
-
-    let p = f.create("Garden", "app");
-    f.act(Action::RenameProject(p.id, "CON".into()));
-    assert_eq!(f.project().name, "Garden");
-    assert!(f.last_activity().text.contains("reserved name on Windows"));
+    let p = f.create("What Next?", "app");
+    assert_eq!(p.name, "What Next?");
+    f.act(Action::RenameProject(p.id, "a/b: CON".into()));
+    assert_eq!(f.project().name, "a/b: CON");
 
     // A folder's name travels too, so one Windows can't hold is refused.
     f.act(Action::AddFolder(p.id, f.folder("notes:old")));

@@ -54,6 +54,10 @@ pub struct Peer {
     /// What the peer said it allows us, as last reported.
     pub granted: Permissions,
     pub last_address: Option<SocketAddr>,
+    /// The paired computer that passes connections to this peer along, for
+    /// a peer this computer can't reach directly.
+    #[serde(default)]
+    pub via: Option<InstanceId>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]

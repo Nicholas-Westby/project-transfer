@@ -54,6 +54,7 @@ impl Instance {
             store: Arc::new(store),
             identity: Arc::new(identity),
             events: tx,
+            found: Default::default(),
         };
         let received = Arc::new(Mutex::new(Vec::new()));
         let r = received.clone();
