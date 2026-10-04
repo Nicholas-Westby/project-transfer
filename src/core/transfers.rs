@@ -144,6 +144,7 @@ impl Core {
         let core = self.clone();
         tokio::spawn(async move {
             let req = preview.request.clone();
+            let link = preview.link.clone();
             let peer = core
                 .ui
                 .lock()
@@ -151,6 +152,19 @@ impl Core {
                 .map_or_else(|| "the other computer".into(), |v| v.peer.name.clone());
             let result = transfer::execute(&mut conn, &core.shared, preview, tx, cancel).await;
             core.sync_projects().await;
+            if let Some(l) = link {
+                // Once the project has the new id, what the other computer
+                // has for it is filed under it too, until the next poll.
+                core.ui.update(|s| {
+                    if s.project(l.from).is_none()
+                        && s.project(l.to).is_some()
+                        && let Some(r) = s.remote_projects.remove(&l.from)
+                    {
+                        s.remote_projects.insert(l.to, r);
+                    }
+                });
+                core.poll_now.notify_one();
+            }
             let state = match result {
                 Ok(summary) => {
                     core.ui.info(done_sentence(req.direction, &peer, &summary));
@@ -250,6 +264,7 @@ mod tests {
             },
             folders: Vec::new(),
             warnings: Vec::new(),
+            link: None,
         }
     }
 

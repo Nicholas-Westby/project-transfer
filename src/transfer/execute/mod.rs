@@ -92,6 +92,9 @@ impl Run<'_> {
     async fn all(&mut self, shared: &Shared, preview: &Preview) -> anyhow::Result<()> {
         let req = &preview.request;
         check_peer(self.conn, req)?;
+        if let Some(link) = &preview.link {
+            link.apply(shared).await?;
+        }
         let (files, bytes) = totals(preview);
         let _ = self.progress.send(Progress::Started {
             total_files: files,

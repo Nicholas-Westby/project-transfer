@@ -23,7 +23,11 @@ impl App {
         let project = req
             .as_ref()
             .and_then(|r| {
+                // A matched project is still under its old id here until
+                // the transfer runs.
+                let old = self.view.follow.filter(|(_, to)| *to == r.project);
                 s.project(r.project)
+                    .or_else(|| old.and_then(|(from, _)| s.project(from)))
                     .map(|p| p.name.clone())
                     .or_else(|| s.remote_projects.get(&r.project).map(|p| p.name.clone()))
             })

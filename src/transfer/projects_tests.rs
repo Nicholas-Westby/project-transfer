@@ -52,10 +52,18 @@ fn default_path_avoids_other_projects_folders() {
     let err = default_path(pf, &[other.clone()], pid, "Garden", id, "app", false).unwrap_err();
     assert!(err.contains("/dev"), "{err}");
 
-    // The project's own folders never count as taken.
+    // Nor inside the project's own folder: pushing that one would carry it.
     nested.id = pid;
-    let own = default_path(pf, &[nested], pid, "Garden", id, "app", true).unwrap();
-    assert_eq!(own, Path::new("/dev/Garden/app"));
+    let own = default_path(pf, &[nested.clone()], pid, "Garden", id, "app", true).unwrap();
+    assert_eq!(own, Path::new("/dev/Garden 2/app"));
+    // Its own folders beside each other are fine, and a folder's own path
+    // never blocks itself.
+    nested.folders[0].local_path = Some("/dev/Garden/x".into());
+    let beside = default_path(pf, &[nested.clone()], pid, "Garden", id, "app", true).unwrap();
+    assert_eq!(beside, Path::new("/dev/Garden/app"));
+    let x = nested.folders[0].id;
+    let itself = default_path(pf, &[nested], pid, "Garden", x, "x", true).unwrap();
+    assert_eq!(itself, Path::new("/dev/Garden/x"));
 }
 
 #[test]

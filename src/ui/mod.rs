@@ -92,6 +92,9 @@ pub struct View {
     pub last_request: Option<TransferRequest>,
     /// A project just asked for, selected once the core adds it.
     pub select_when_added: Option<String>,
+    /// A project that takes the other computer's id when its transfer runs:
+    /// (old, new), so the selection stays on it.
+    pub follow: Option<(ProjectId, ProjectId)>,
     /// What this computer will allow a computer asking to pair, as edited.
     pub prompt_allows: Option<(crate::model::InstanceId, Permissions)>,
     /// This computer's addresses, read when a sheet opens.
@@ -135,10 +138,17 @@ impl App {
             ui.ctx().set_theme(theme::preference(s.me.theme));
             self.view.applied_theme = Some(s.me.theme);
         }
-        self.keep_selection(&s);
+        if matches!(s.transfer, TransferState::Idle) {
+            // Cancelled: the project kept its id.
+            self.view.follow = None;
+        }
         if let TransferState::Ready(p) = &s.transfer {
             self.view.last_request = Some(p.request.clone());
+            if let Some(l) = &p.link {
+                self.view.follow = Some((l.from, l.to));
+            }
         }
+        self.keep_selection(&s);
 
         self.session_bar(ui, &s);
         self.activity(ui, &s);
@@ -155,6 +165,15 @@ impl App {
 
     /// Keeps a valid project selected, so a fresh list opens its first one.
     fn keep_selection(&mut self, s: &UiState) {
+        if let Some((from, to)) = self.view.follow
+            && s.project(from).is_none()
+            && s.project(to).is_some()
+        {
+            if self.view.selected == Some(from) {
+                self.view.selected = Some(to);
+            }
+            self.view.follow = None;
+        }
         if let Some(name) = &self.view.select_when_added
             && let Some(p) = s.projects.iter().rev().find(|p| &p.name == name)
         {

@@ -223,6 +223,7 @@ mod tests {
                 replaced: vec![],
             }],
             warnings: vec![],
+            link: None,
         }
     }
 
