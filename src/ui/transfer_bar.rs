@@ -61,14 +61,14 @@ impl App {
                 ui.vertical(|ui| {
                     let r = ui
                         .add_enabled_ui(reason.is_none(), |ui| {
-                            ui.add_sized(
-                                [ui.available_width(), 36.0],
-                                egui::Button::new(
-                                    RichText::new(&label).color(pal.on_fill()).strong(),
+                            widgets::with_fill(ui, pal.route, |ui| {
+                                ui.add_sized(
+                                    [ui.available_width(), 36.0],
+                                    egui::Button::new(
+                                        RichText::new(&label).color(pal.on_fill()).strong(),
+                                    ),
                                 )
-                                .fill(pal.route)
-                                .stroke(egui::Stroke::NONE),
-                            )
+                            })
                         })
                         .inner;
                     if r.clicked() {

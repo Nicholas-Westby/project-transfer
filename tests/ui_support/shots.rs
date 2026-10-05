@@ -173,6 +173,17 @@ pub fn all(dir: &Path) {
     shot(dir, "20-computers-address-error", f, |h| {
         super::open_computers(h)
     });
+    for (name, label) in [
+        ("21-hover-push", "Push to Desktop Swift Heron"),
+        ("21b-hover-quiet", "Add folder"),
+        ("21c-hover-row", "tide-tables"),
+        ("21d-hover-button", "Add command"),
+        ("21e-hover-icon", "Settings"),
+    ] {
+        shot(dir, name, FakeBackend::seeded(), |h| {
+            h.get_by_label(label).hover();
+        });
+    }
     let _ = Action::Execute;
 }
 
