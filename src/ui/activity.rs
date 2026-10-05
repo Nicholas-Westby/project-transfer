@@ -72,7 +72,12 @@ impl App {
                                     egui::FontId::proportional(12.0),
                                     pal.muted(),
                                 );
-                                ui.label(RichText::new(&line.text).color(color(line.kind)));
+                                ui.add(
+                                    egui::Label::new(
+                                        RichText::new(&line.text).color(color(line.kind)),
+                                    )
+                                    .wrap(),
+                                );
                             });
                         }
                     });

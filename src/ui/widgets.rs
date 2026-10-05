@@ -3,8 +3,8 @@
 
 use super::theme::{CONTROL_RADIUS, Palette, mix, semibold};
 use egui::{
-    Button, Color32, CornerRadius, FontId, Response, RichText, Sense, Stroke, Ui, Vec2, WidgetInfo,
-    WidgetType,
+    Button, Color32, CornerRadius, FontId, Response, RichText, Sense, Stroke, TextStyle,
+    TextWrapMode, Ui, Vec2, WidgetInfo, WidgetText, WidgetType,
 };
 use std::path::Path;
 
@@ -159,6 +159,19 @@ pub fn mono(text: impl Into<String>) -> RichText {
     RichText::new(text.into()).monospace()
 }
 
+/// How wide `text` is on one line, to make room for it before it is drawn.
+pub fn text_width(ui: &Ui, text: impl Into<WidgetText>) -> f32 {
+    text.into()
+        .into_galley(
+            ui,
+            Some(TextWrapMode::Extend),
+            f32::INFINITY,
+            TextStyle::Body,
+        )
+        .size()
+        .x
+}
+
 /// A section heading inside a view: body size, semibold.
 pub fn section(ui: &mut Ui, text: &str) -> Response {
     ui.label(RichText::new(text).font(FontId::new(15.0, semibold())))
@@ -217,13 +230,16 @@ pub fn chevron(ui: &Ui, at: egui::Pos2, open: bool, color: Color32) {
         .add(egui::Shape::convex_polygon(pts, color, egui::Stroke::NONE));
 }
 
+/// Room on each side of a badge's text.
+pub const BADGE_PAD: i8 = 6;
+
 /// A small rounded tag such as "Primary".
 pub fn badge(ui: &mut Ui, text: &str) -> Response {
     let pal = Palette::of(ui.ctx());
     egui::Frame::new()
         .fill(pal.route_tint())
         .corner_radius(CornerRadius::same(CONTROL_RADIUS))
-        .inner_margin(egui::Margin::symmetric(6, 1))
+        .inner_margin(egui::Margin::symmetric(BADGE_PAD, 1))
         .show(ui, |ui| {
             ui.label(RichText::new(text).small().color(pal.route))
         })

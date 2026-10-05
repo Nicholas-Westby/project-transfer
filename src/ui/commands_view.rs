@@ -6,7 +6,7 @@ use super::{App, Confirm, Sheet, dialogs};
 use crate::commands::must_confirm;
 use crate::core::{Action, CommandRun, RunStatus, UiState};
 use crate::model::{Command, CommandId, Os, Project, ProjectId};
-use egui::{Align, Frame, Layout, Margin, RichText, ScrollArea, TextEdit, Ui};
+use egui::{Align, Frame, Layout, Margin, RichText, ScrollArea, Sides, TextEdit, Ui};
 
 impl App {
     pub(super) fn commands_section(&mut self, ui: &mut Ui, s: &UiState, p: &Project) {
@@ -43,32 +43,51 @@ impl App {
         let pal = Palette::of(ui.ctx());
         let run = s.command_runs.get(&c.id);
         let running = run.is_some_and(|r| r.status == RunStatus::Running);
-        ui.horizontal(|ui| {
-            let r = ui.add_enabled(!running, egui::Button::new(format!("▶ {}", c.label)));
-            if r.clicked() {
-                self.request_run(p.id, c);
-            }
-            ui.label(mono(&c.line).color(pal.muted()));
-            if c.created_on != Os::current() {
-                widgets::small_muted(ui, format!("Made on {}", os_name(c.created_on)));
-            }
-            ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
-                if widgets::quiet(ui, "Delete", Some(pal.removed)).clicked() {
-                    self.view.confirm = Some(Confirm::DeleteCommand(p.id, c.id));
+        // The buttons on the right go first; the command line gives way.
+        let (start, (delete, edit, stop)) = Sides::new().shrink_left().truncate().show(
+            ui,
+            |ui| {
+                let r = ui.add_enabled(!running, egui::Button::new(format!("▶ {}", c.label)));
+                let note = (c.created_on != Os::current()).then(|| {
+                    let text = format!("Made on {}", os_name(c.created_on));
+                    RichText::new(text).small().color(pal.muted())
+                });
+                let room = note.as_ref().map_or(0.0, |n| {
+                    widgets::text_width(ui, n.clone()) + ui.spacing().item_spacing.x
+                });
+                ui.scope(|ui| {
+                    ui.set_max_width((ui.available_width() - room).max(0.0));
+                    ui.label(mono(&c.line).color(pal.muted()));
+                });
+                if let Some(n) = note {
+                    ui.label(n);
                 }
-                if widgets::quiet(ui, "Edit", None).clicked() {
-                    self.view.sheet = Sheet::CommandEditor {
-                        project: p.id,
-                        id: Some(c.id),
-                        label: c.label.clone(),
-                        line: c.line.clone(),
-                    };
-                }
-                if running && widgets::quiet(ui, "Stop", Some(pal.removed)).clicked() {
-                    self.act(Action::StopCommand(c.id));
-                }
-            });
-        });
+                r.clicked()
+            },
+            |ui| {
+                let delete = widgets::quiet(ui, "Delete", Some(pal.removed)).clicked();
+                let edit = widgets::quiet(ui, "Edit", None).clicked();
+                let stop = running && widgets::quiet(ui, "Stop", Some(pal.removed)).clicked();
+                (delete, edit, stop)
+            },
+        );
+        if start {
+            self.request_run(p.id, c);
+        }
+        if delete {
+            self.view.confirm = Some(Confirm::DeleteCommand(p.id, c.id));
+        }
+        if edit {
+            self.view.sheet = Sheet::CommandEditor {
+                project: p.id,
+                id: Some(c.id),
+                label: c.label.clone(),
+                line: c.line.clone(),
+            };
+        }
+        if stop {
+            self.act(Action::StopCommand(c.id));
+        }
         if let Some(run) = run
             && !self.view.hidden_output.contains(&c.id)
         {
@@ -111,27 +130,27 @@ impl App {
                         }
                     });
                 ui.add_space(4.0);
-                ui.horizontal(|ui| {
-                    let (text, color) = match &run.status {
-                        RunStatus::Running => ("Running…".to_string(), pal.muted()),
-                        RunStatus::Exited(Some(0)) => {
-                            ("Finished with exit code 0".into(), pal.added)
-                        }
-                        RunStatus::Exited(Some(n)) => {
-                            (format!("Finished with exit code {n}"), pal.removed)
-                        }
-                        RunStatus::Exited(None) => ("Stopped".into(), pal.muted()),
-                        RunStatus::Failed(e) => (e.clone(), pal.removed),
-                    };
-                    ui.label(RichText::new(text).small().color(color));
-                    ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
-                        if run.status != RunStatus::Running
+                let (text, color) = match &run.status {
+                    RunStatus::Running => ("Running…".to_string(), pal.muted()),
+                    RunStatus::Exited(Some(0)) => ("Finished with exit code 0".into(), pal.added),
+                    RunStatus::Exited(Some(n)) => {
+                        (format!("Finished with exit code {n}"), pal.removed)
+                    }
+                    RunStatus::Exited(None) => ("Stopped".into(), pal.muted()),
+                    RunStatus::Failed(e) => (e.clone(), pal.removed),
+                };
+                // A long failure wraps beside the button rather than past it.
+                let (_, hide) = Sides::new().shrink_left().wrap().show(
+                    ui,
+                    |ui| ui.label(RichText::new(text).small().color(color)),
+                    |ui| {
+                        run.status != RunStatus::Running
                             && widgets::quiet(ui, "Hide output", None).clicked()
-                        {
-                            self.view.hidden_output.insert(id);
-                        }
-                    });
-                });
+                    },
+                );
+                if hide {
+                    self.view.hidden_output.insert(id);
+                }
             });
     }
 
