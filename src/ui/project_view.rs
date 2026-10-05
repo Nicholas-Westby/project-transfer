@@ -7,9 +7,7 @@ use super::{App, Confirm, peer_name};
 use crate::core::{Action, UiState};
 use crate::model::{Direction, Project};
 use crate::transfer::projects::now_ms;
-use egui::{
-    Align, CentralPanel, Frame, Key, Layout, Margin, RichText, ScrollArea, Sense, TextEdit, Ui,
-};
+use egui::{CentralPanel, Frame, Key, Margin, RichText, ScrollArea, Sense, Sides, TextEdit, Ui};
 
 pub const NO_PROJECTS: &str = "Add a project to start. Pick its folder on this computer first.";
 
@@ -72,53 +70,62 @@ impl App {
 
     fn title_row(&mut self, ui: &mut Ui, p: &Project) {
         let pal = Palette::of(ui.ctx());
-        ui.horizontal(|ui| {
-            let editing = self
-                .view
-                .rename_project
-                .take()
-                .filter(|(id, _)| *id == p.id);
-            if let Some((id, mut draft)) = editing {
-                let r = ui.add(
-                    TextEdit::singleline(&mut draft)
-                        .font(title_style())
-                        .desired_width(360.0),
-                );
-                r.request_focus();
-                if ui.input(|i| i.key_pressed(Key::Escape)) {
-                    return;
-                }
-                let done = ui.input(|i| i.key_pressed(Key::Enter)) || r.lost_focus();
-                if done {
-                    let name = draft.trim();
-                    if !name.is_empty() && name != p.name {
-                        self.act(Action::RenameProject(id, name.to_string()));
+        // The button goes first, so a long name gives way to it.
+        let sides = Sides::new()
+            .height(ui.text_style_height(&title_style()))
+            .shrink_left()
+            .truncate();
+        let delete_button =
+            |ui: &mut Ui| widgets::quiet(ui, "Delete project", Some(pal.removed)).clicked();
+        let (_, delete) = sides.show(
+            ui,
+            |ui| {
+                let editing = self
+                    .view
+                    .rename_project
+                    .take()
+                    .filter(|(id, _)| *id == p.id);
+                if let Some((id, mut draft)) = editing {
+                    let r = ui.add(
+                        TextEdit::singleline(&mut draft)
+                            .font(title_style())
+                            .desired_width(360.0),
+                    );
+                    r.request_focus();
+                    if ui.input(|i| i.key_pressed(Key::Escape)) {
+                        return;
                     }
-                    return;
-                }
-                self.view.rename_project = Some((id, draft));
-            } else {
-                let r = ui
-                    .add(
-                        egui::Label::new(
-                            RichText::new(&p.name)
-                                .text_style(title_style())
-                                .color(pal.ink),
+                    let done = ui.input(|i| i.key_pressed(Key::Enter)) || r.lost_focus();
+                    if done {
+                        let name = draft.trim();
+                        if !name.is_empty() && name != p.name {
+                            self.act(Action::RenameProject(id, name.to_string()));
+                        }
+                        return;
+                    }
+                    self.view.rename_project = Some((id, draft));
+                } else {
+                    let r = ui
+                        .add(
+                            egui::Label::new(
+                                RichText::new(&p.name)
+                                    .text_style(title_style())
+                                    .color(pal.ink),
+                            )
+                            .sense(Sense::click()),
                         )
-                        .sense(Sense::click()),
-                    )
-                    .on_hover_cursor(egui::CursorIcon::Text)
-                    .on_hover_text("Click to rename");
-                if r.clicked() {
-                    self.view.rename_project = Some((p.id, p.name.clone()));
+                        .on_hover_cursor(egui::CursorIcon::Text)
+                        .on_hover_text("Click to rename");
+                    if r.clicked() {
+                        self.view.rename_project = Some((p.id, p.name.clone()));
+                    }
                 }
-            }
-            ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
-                if widgets::quiet(ui, "Delete project", Some(pal.removed)).clicked() {
-                    self.view.confirm = Some(Confirm::DeleteProject(p.id));
-                }
-            });
-        });
+            },
+            delete_button,
+        );
+        if delete {
+            self.view.confirm = Some(Confirm::DeleteProject(p.id));
+        }
     }
 }
 

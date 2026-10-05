@@ -208,6 +208,19 @@ pub fn all(dir: &Path) {
     let img = h.render().expect("render");
     img.save(dir.join("22b-description-narrow.png"))
         .expect("save png");
+    // The smallest window, with the activity strip open: everything shrinks.
+    let mut h = super::build(
+        FakeBackend::seeded(),
+        Box::new(FixedPicker),
+        [900.0, 600.0],
+        2.0,
+        true,
+    );
+    h.state_mut().view.activity_open = true;
+    h.run_ok();
+    let img = h.render().expect("render");
+    img.save(dir.join("01b-main-smallest.png"))
+        .expect("save png");
     let _ = Action::Execute;
 }
 
