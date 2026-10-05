@@ -55,7 +55,7 @@ async fn first_push_creates_everything_including_empty_dirs() {
         (b.id().await, Direction::Push, 2)
     );
     let received = b.received.lock().unwrap().clone();
-    assert_eq!(received, vec![(p.id, a.id().await, 2)]);
+    assert_eq!(received, vec![(p.id, a.id().await, 2, 0)]);
 }
 
 #[tokio::test]

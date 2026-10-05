@@ -2,14 +2,8 @@
 
 use super::{Run, Side};
 use crate::protocol::{Request, Response};
+use crate::transfer::Op;
 use crate::transfer::prepare::unexpected;
-
-pub(super) enum Op<'a> {
-    MakeDir,
-    Symlink(&'a str),
-    SetMtime(i64),
-    Remove(bool),
-}
 
 impl Run<'_> {
     pub(super) async fn expect_ok(&mut self, req: &Request, what: &str) -> anyhow::Result<()> {
@@ -49,13 +43,7 @@ impl Run<'_> {
                     other => return Err(unexpected(self.conn, "a change", other)),
                 }
             }
-            Side::Pull(a, ..) => match op {
-                Op::MakeDir => a.make_dir(rel),
-                Op::Symlink(t) => a.make_symlink(rel, t),
-                Op::SetMtime(ms) => a.set_mtime(rel, ms),
-                Op::Remove(is_dir) => a.remove(rel, is_dir),
-            }
-            .map_err(|e| e.to_string()),
+            Side::Pull(a, ..) => op.apply(a, rel),
         };
         match result {
             Ok(()) => Ok(true),

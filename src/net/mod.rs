@@ -78,6 +78,8 @@ pub enum NetEvent {
         project: ProjectId,
         peer: InstanceId,
         files: u64,
+        /// Entries this computer refused; the log says why for each.
+        failed: u64,
     },
     Log(String),
 }

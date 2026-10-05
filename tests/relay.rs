@@ -107,7 +107,7 @@ async fn a_push_through_the_relay_arrives() {
     assert_eq!(read(&dest, "src/main.rs"), "fn main() {}");
     assert_eq!(read(&dest, "seeds.txt"), seeds);
     let received = t.b.received.lock().unwrap().clone();
-    assert_eq!(received, vec![(p.id, t.a.id().await, 2)]);
+    assert_eq!(received, vec![(p.id, t.a.id().await, 2, 0)]);
 }
 
 #[tokio::test]

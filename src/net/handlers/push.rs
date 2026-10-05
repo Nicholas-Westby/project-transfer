@@ -5,7 +5,7 @@ use crate::model::{Direction, Project, ProjectId};
 use crate::net::NetEvent;
 use crate::protocol::{Request, Response};
 use crate::transfer::projects::{StartedBy, adopt, record_transfer, update_projects};
-use crate::transfer::{Applier, validate_name, validate_rel};
+use crate::transfer::{Applier, Op, validate_name, validate_rel};
 use std::collections::HashMap;
 use tokio::io::{AsyncRead, AsyncReadExt};
 use tracing::{info, warn};
@@ -18,6 +18,8 @@ pub struct PushState {
     applier: Applier,
     /// Files written in this push, across its folders.
     files: u64,
+    /// Entries refused in this push, across its folders.
+    failed: u64,
 }
 
 pub struct Incoming<'a> {
@@ -35,31 +37,39 @@ pub async fn handle(ctx: &Ctx<'_>, state: &mut SessionState, req: Request) -> Re
             expected_path,
         } => begin(ctx, state, project, folder, &expected_path).await,
         Request::EndPush => end(ctx, state).await,
-        Request::MakeDir { rel } => apply(state, &rel, |a| a.make_dir(&rel)),
-        Request::MakeSymlink { rel, target } => {
-            apply(state, &rel, |a| a.make_symlink(&rel, &target))
-        }
-        Request::SetMtime { rel, mtime_ms } => apply(state, &rel, |a| a.set_mtime(&rel, mtime_ms)),
-        Request::Remove { rel, is_dir } => apply(state, &rel, |a| a.remove(&rel, is_dir)),
+        Request::MakeDir { rel } => apply(ctx, state, &rel, Op::MakeDir),
+        Request::MakeSymlink { rel, target } => apply(ctx, state, &rel, Op::Symlink(&target)),
+        Request::SetMtime { rel, mtime_ms } => apply(ctx, state, &rel, Op::SetMtime(mtime_ms)),
+        Request::Remove { rel, is_dir } => apply(ctx, state, &rel, Op::Remove(is_dir)),
         other => refused(format!("Unexpected request {other:?}.")),
     }
 }
 
-fn apply(
-    state: &mut SessionState,
-    rel: &str,
-    op: impl FnOnce(&Applier) -> std::io::Result<()>,
-) -> Response {
-    if let Err(reason) = validate_rel(rel) {
-        return refused(reason);
-    }
-    let Some(push) = &state.push else {
-        return refused(NO_PUSH);
+fn apply(ctx: &Ctx<'_>, state: &mut SessionState, rel: &str, op: Op<'_>) -> Response {
+    let done = match (validate_rel(rel), &state.push) {
+        (Err(reason), _) => Err(reason),
+        (Ok(()), None) => Err(NO_PUSH.to_string()),
+        (Ok(()), Some(push)) => op.apply(&push.applier, rel),
     };
-    match op(&push.applier) {
+    match done {
         Ok(()) => Response::Ok,
-        Err(e) => refused(format!("\"{rel}\": {e}")),
+        Err(reason) => refuse(ctx, state, rel, reason),
     }
+}
+
+/// The computer that pushed lists a refusal only until its summary closes,
+/// so each one is counted and logged here as well.
+fn refuse(ctx: &Ctx<'_>, state: &mut SessionState, rel: &str, reason: String) -> Response {
+    let peer = &ctx.peer.name;
+    match &mut state.push {
+        Some(push) => {
+            push.failed += 1;
+            let root = push.applier.root().display();
+            warn!("could not apply \"{rel}\" from {peer} to {root}: {reason}");
+        }
+        None => warn!("could not apply \"{rel}\" from {peer}: {reason}"),
+    }
+    refused(reason)
 }
 
 async fn begin(
@@ -130,15 +140,16 @@ async fn begin(
             root.display()
         ),
     }
-    let files = match &state.push {
-        Some(p) if p.project == project.id => p.files,
-        _ => 0,
+    let (files, failed) = match &state.push {
+        Some(p) if p.project == project.id => (p.files, p.failed),
+        _ => (0, 0),
     };
     info!("{} began pushing to {}", ctx.peer.name, root.display());
     state.push = Some(PushState {
         project: project.id,
         applier,
         files,
+        failed,
     });
     Response::Ok
 }
@@ -152,7 +163,7 @@ async fn end(ctx: &Ctx<'_>, state: &mut SessionState) -> Response {
         return refused(NO_PUSH);
     };
     let peer = ctx.peer.id;
-    let (project, files) = (push.project, push.files);
+    let (project, files, failed) = (push.project, push.files, push.failed);
     if let Err(e) = record_transfer(
         ctx.shared,
         project,
@@ -165,11 +176,19 @@ async fn end(ctx: &Ctx<'_>, state: &mut SessionState) -> Response {
     {
         warn!("could not record the push: {e:#}");
     }
-    info!("{} pushed {} files", ctx.peer.name, push.files);
+    if failed == 0 {
+        info!("{} pushed {files} files", ctx.peer.name);
+    } else {
+        warn!(
+            "{} pushed {files} files; {failed} could not be applied",
+            ctx.peer.name
+        );
+    }
     let _ = ctx.shared.events.send(NetEvent::Received {
-        project: push.project,
+        project,
         peer,
-        files: push.files,
+        files,
+        failed,
     });
     Response::Ok
 }
@@ -177,6 +196,7 @@ async fn end(ctx: &Ctx<'_>, state: &mut SessionState) -> Response {
 /// Always reads all `size` bytes so the connection stays in step, even when
 /// the file is refused. A connection that ends early drops the temp file.
 pub async fn put_file<S: AsyncRead + Unpin>(
+    ctx: &Ctx<'_>,
     state: &mut SessionState,
     stream: &mut S,
     file: Incoming<'_>,
@@ -188,7 +208,7 @@ pub async fn put_file<S: AsyncRead + Unpin>(
             None => problem = Some(NO_PUSH.into()),
             Some(p) => match p.applier.begin_file(file.rel) {
                 Ok(f) => pending = Some(f),
-                Err(e) => problem = Some(format!("\"{}\": {e}", file.rel)),
+                Err(e) => problem = Some(format!("Could not write it: {e}")),
             },
         }
     }
@@ -201,7 +221,7 @@ pub async fn put_file<S: AsyncRead + Unpin>(
         if let Some(p) = &mut pending
             && let Err(e) = p.write(&buf[..n])
         {
-            problem = Some(format!("\"{}\": {e}", file.rel));
+            problem = Some(format!("Could not write it: {e}"));
             pending = None;
         }
     }
@@ -213,8 +233,9 @@ pub async fn put_file<S: AsyncRead + Unpin>(
                 }
                 return Ok(Response::Ok);
             }
-            Err(e) => problem = Some(format!("\"{}\": {e}", file.rel)),
+            Err(e) => problem = Some(format!("Could not write it: {e}")),
         }
     }
-    Ok(refused(problem.unwrap_or_else(|| NO_PUSH.into())))
+    let reason = problem.unwrap_or_else(|| NO_PUSH.into());
+    Ok(refuse(ctx, state, file.rel, reason))
 }

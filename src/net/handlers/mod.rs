@@ -87,7 +87,7 @@ pub async fn handle<S: AsyncRead + AsyncWrite + Unpin + Send>(
                 mtime_ms,
                 exec,
             };
-            push::put_file(state, stream, file).await?
+            push::put_file(ctx, state, stream, file).await?
         }
         other => push::handle(ctx, state, other).await,
     };

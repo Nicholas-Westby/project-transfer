@@ -3,12 +3,14 @@
 pub mod apply;
 mod execute;
 pub mod link;
+mod op;
 mod prepare;
 mod preview;
 pub mod projects;
 
 pub use apply::{Applier, PendingFile, safe_join, validate_name, validate_rel};
 pub use execute::execute;
+pub use op::Op;
 pub use prepare::prepare;
 pub use preview::{
     Counts, FolderPreview, Preview, Replaced, TransferRequest, drop_unholdable, replaced_folders,
