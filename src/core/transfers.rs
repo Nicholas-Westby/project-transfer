@@ -265,6 +265,7 @@ mod tests {
             folders: Vec::new(),
             warnings: Vec::new(),
             link: None,
+            description: false,
         }
     }
 

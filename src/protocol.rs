@@ -2,7 +2,9 @@
 
 use crate::ignore_rules::IgnoreSpec;
 use crate::manifest::Manifest;
-use crate::model::{Command, FolderId, InstanceId, Os, Permissions, Project, ProjectId};
+use crate::model::{
+    Command, Description, FolderId, InstanceId, Os, Permissions, Project, ProjectId,
+};
 use anyhow::{Context, bail};
 use serde::{Deserialize, Serialize, de::DeserializeOwned};
 use std::collections::HashMap;
@@ -224,6 +226,9 @@ pub struct RemoteProject {
     pub name: String,
     pub folders: Vec<RemoteFolder>,
     pub primary: FolderId,
+    /// Missing from computers that don't have descriptions yet.
+    #[serde(default)]
+    pub description: Description,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]

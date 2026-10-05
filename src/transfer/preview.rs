@@ -20,6 +20,8 @@ pub struct Preview {
     /// The other computer's ids this computer's project takes on when the
     /// transfer runs; `request.project` is already the new id.
     pub link: Option<super::link::Link>,
+    /// The transfer changes the description on the receiving computer.
+    pub description: bool,
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -104,7 +106,12 @@ impl Preview {
         c
     }
 
+    /// Nothing at all to do: no file changes, and the description matches.
     pub fn is_empty(&self) -> bool {
+        self.files_match() && !self.description
+    }
+
+    pub fn files_match(&self) -> bool {
         self.folders.iter().all(|f| f.plan.changes.is_empty())
     }
 }

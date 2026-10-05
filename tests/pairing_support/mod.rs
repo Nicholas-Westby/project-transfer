@@ -153,6 +153,7 @@ pub fn project() -> Project {
         folders: vec![folder],
         commands: vec![],
         last_transfer: None,
+        description: Default::default(),
     }
 }
 

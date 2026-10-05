@@ -219,3 +219,17 @@ fn a_folder_name_with_a_trailing_space_is_refused() {
     assert!(line.text.contains("Windows"), "{}", line.text);
     assert!(f.core.state().projects.is_empty());
 }
+
+#[test]
+fn a_description_is_saved_without_trailing_blank_lines() {
+    let f = Fixture::new();
+    let p = f.create("Garden", "app");
+    f.act(Action::SetDescription(
+        p.id,
+        "Plans the beds.\nWaters on Mondays.\n\n".into(),
+    ));
+    let d = f.project().description;
+    assert_eq!(d.text, "Plans the beds.\nWaters on Mondays.");
+    assert!(d.at_ms > 0);
+    assert_eq!(f.store().load_projects().unwrap()[0].description, d);
+}

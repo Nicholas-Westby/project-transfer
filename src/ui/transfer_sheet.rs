@@ -151,6 +151,27 @@ fn ready(ui: &mut Ui, p: &Preview, peer: &str) -> Option<bool> {
         }
         return done_row(ui).then_some(true);
     }
+    let description = match p.request.direction {
+        Direction::Push => format!("The description on {peer} is replaced with this one."),
+        Direction::Pull => format!("The description here is replaced with the one on {peer}."),
+    };
+    if p.files_match() {
+        // Only the description differs; the transfer still carries it.
+        widgets::muted(ui, "The files already match.");
+        widgets::muted(ui, description);
+        preview_view::folder_lines(ui, p);
+        for w in preview::warnings(p, peer) {
+            ui.label(preview_view::ticks(&w, pal.changed));
+        }
+        let label = match p.request.direction {
+            Direction::Push => format!("Push the description to {peer}"),
+            Direction::Pull => format!("Pull the description from {peer}"),
+        };
+        return dialogs::button_row(ui, &label, false, true);
+    }
+    if p.description {
+        widgets::muted(ui, description);
+    }
     preview_view::show(ui, p, peer);
     let removes = p.counts().removed_files > 0;
     dialogs::button_row(ui, &preview::confirm_label(p, peer), removes, true)

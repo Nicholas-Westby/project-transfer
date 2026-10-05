@@ -2,7 +2,7 @@
 //! primary folder a member of the project and never touches files on disk.
 
 use super::Core;
-use crate::model::{Command, CommandId, Folder, FolderId, Os, Project, ProjectId};
+use crate::model::{Command, CommandId, Description, Folder, FolderId, Os, Project, ProjectId};
 use crate::transfer::projects::{now_ms, update_projects};
 use std::path::{Path, PathBuf};
 
@@ -38,6 +38,7 @@ impl Core {
                 folders: vec![f],
                 commands: Vec::new(),
                 last_transfer: None,
+                description: Default::default(),
             });
             Ok(format!(
                 "Created project `{name}` with folder {}.",
@@ -53,6 +54,17 @@ impl Core {
             let p = project(all, id)?;
             let old = std::mem::replace(&mut p.name, name.clone());
             Ok(format!("Renamed project `{old}` to `{name}`."))
+        })
+        .await
+    }
+
+    pub(super) async fn set_description(&self, id: ProjectId, text: String) -> anyhow::Result<()> {
+        // Trailing blank lines are a slip of the Enter key, not content.
+        let text = text.trim_end().to_string();
+        self.edit(|all| {
+            let p = project(all, id)?;
+            p.description = Description::edited(&text, &p.description, now_ms());
+            Ok(format!("Saved the description of `{}`.", p.name))
         })
         .await
     }

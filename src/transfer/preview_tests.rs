@@ -68,6 +68,7 @@ fn preview(plans: Vec<Plan>) -> Preview {
             .collect(),
         warnings: vec![],
         link: None,
+        description: false,
     }
 }
 

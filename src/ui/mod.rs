@@ -6,6 +6,7 @@ mod activity;
 mod commands_view;
 mod computers;
 mod confirmations;
+pub mod description;
 pub mod dialogs;
 mod folders;
 mod pairing;
@@ -83,6 +84,8 @@ pub struct View {
     pub confirm: Option<Confirm>,
     pub rename_me: Option<String>,
     pub rename_project: Option<(ProjectId, String)>,
+    /// The description being typed, until its box loses focus.
+    pub description: Option<description::Draft>,
     pub send_everything: bool,
     pub activity_open: bool,
     pub address: String,

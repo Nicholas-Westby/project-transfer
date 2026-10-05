@@ -97,9 +97,18 @@ pub async fn prepare(
         warnings,
     };
     let mut folders = Vec::new();
+    let description;
     match req.direction {
         Direction::Push => {
             let p = local.context("This project is not on this computer.")?;
+            let ask = Request::ProjectInfo {
+                project: req.project,
+            };
+            let theirs = match ctx.conn.request(&ask).await? {
+                Response::ProjectInfo(info) => info.map(|i| i.description).unwrap_or_default(),
+                other => return Err(unexpected(ctx.conn, "the project request", other)),
+            };
+            description = p.description.replaces(&theirs);
             let multi = p.folders.len() > 1;
             for f in &p.folders {
                 let Some(root) = f.local_path.clone().filter(|r| r.is_dir()) else {
@@ -144,6 +153,8 @@ pub async fn prepare(
             };
             let names: Vec<&str> = info.folders.iter().map(|f| f.name.as_str()).collect();
             check_names_for(&names, Os::current(), "This computer")?;
+            let mine = local.as_ref().map(|p| p.description.clone());
+            description = info.description.replaces(&mine.unwrap_or_default());
             let multi = info.folders.len() > 1;
             for rf in &info.folders {
                 let remote = ctx.remote_scan(rf.id, &rf.name, &info.name, multi).await?;
@@ -202,6 +213,7 @@ pub async fn prepare(
         folders,
         warnings: ctx.warnings,
         link,
+        description,
     })
 }
 

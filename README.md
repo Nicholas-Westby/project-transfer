@@ -93,6 +93,10 @@ A project is a name plus one or more folders that move together. Each computer
 picks its own folder for each one, with the normal folder picker, so the paths
 can differ (`~/Dev/garden` on a Mac, `D:\dev\garden` on Windows).
 
+- Under a project's name is its description, a box you can type notes
+  into over several lines. It saves when you click away, and Esc undoes
+  your changes. It travels with the project on a push or pull, and the
+  newer edit wins, so an older copy never overwrites a newer one.
 - A project's name is a label and can be anything. A project with several
   folders is kept in a folder named after it on other computers, with
   characters some systems don't allow left out (`What Next?` becomes

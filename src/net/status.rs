@@ -45,6 +45,7 @@ pub(super) async fn project_info(shared: &Shared, project: ProjectId) -> Respons
         .map(|p| RemoteProject {
             name: p.name.clone(),
             primary: p.primary,
+            description: p.description.clone(),
             folders: p
                 .folders
                 .iter()

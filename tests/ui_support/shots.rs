@@ -52,6 +52,14 @@ pub fn all(dir: &Path) {
 
     let f = FakeBackend::seeded();
     f.update(|s| {
+        let mut p = sample_preview(s);
+        p.folders.iter_mut().for_each(|f| f.plan.changes.clear());
+        p.description = true;
+        s.transfer = TransferState::Ready(p);
+    });
+    shot(dir, "04c-preview-description-only", f, none);
+    let f = FakeBackend::seeded();
+    f.update(|s| {
         let p = sample_preview(s);
         s.transfer = TransferState::Ready(p);
     });
@@ -184,6 +192,22 @@ pub fn all(dir: &Path) {
             h.get_by_label(label).hover();
         });
     }
+    shot(dir, "22-description-editing", FakeBackend::seeded(), |h| {
+        h.get_by_label("Description").focus();
+    });
+    // A word longer than the box still wraps inside it.
+    let f = FakeBackend::seeded();
+    f.update(|s| {
+        s.projects[0]
+            .description
+            .text
+            .push_str(&"-and-more".repeat(20))
+    });
+    let mut h = super::build(f, Box::new(FixedPicker), [900.0, 720.0], 2.0, true);
+    h.run_ok();
+    let img = h.render().expect("render");
+    img.save(dir.join("22b-description-narrow.png"))
+        .expect("save png");
     let _ = Action::Execute;
 }
 

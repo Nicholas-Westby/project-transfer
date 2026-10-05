@@ -17,6 +17,7 @@ fn project(folders: Vec<Folder>) -> Project {
         folders,
         commands: vec![],
         last_transfer: None,
+        description: Default::default(),
     }
 }
 

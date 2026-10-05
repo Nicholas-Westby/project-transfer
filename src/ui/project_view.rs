@@ -58,6 +58,8 @@ impl App {
 
     fn project_body(&mut self, ui: &mut Ui, s: &UiState, p: &Project) {
         self.title_row(ui, p);
+        ui.add_space(6.0);
+        self.description(ui, p);
         ui.add_space(12.0);
         self.folders(ui, s, p);
         ui.add_space(16.0);

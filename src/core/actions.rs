@@ -48,6 +48,8 @@ pub enum Action {
         folder: PathBuf,
     },
     RenameProject(ProjectId, String),
+    /// Saves the project's description, as typed.
+    SetDescription(ProjectId, String),
     /// Forgets the project here; its files stay on disk.
     DeleteProject(ProjectId),
     AddFolder(ProjectId, PathBuf),
@@ -124,6 +126,7 @@ impl Core {
 
             Action::CreateProject { name, folder } => self.create_project(name, folder).await,
             Action::RenameProject(id, name) => self.rename_project(id, name).await,
+            Action::SetDescription(id, text) => self.set_description(id, text).await,
             Action::DeleteProject(id) => self.delete_project(id).await,
             Action::AddFolder(id, path) => self.add_folder(id, path).await,
             Action::RemoveFolder(id, f) => self.remove_folder(id, f).await,
