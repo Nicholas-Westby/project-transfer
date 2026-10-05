@@ -130,6 +130,22 @@ fn set_mtime_changes_only_the_time() {
 }
 
 #[test]
+fn a_read_only_file_still_gets_its_time_fixed() {
+    // Git makes its object files read-only, and a push often only fixes
+    // their time.
+    let t = tempfile::tempdir().unwrap();
+    let f = t.path().join("object");
+    std::fs::write(&f, "same").unwrap();
+    let mut p = std::fs::metadata(&f).unwrap().permissions();
+    p.set_readonly(true);
+    std::fs::set_permissions(&f, p).unwrap();
+    let a = Applier::new(t.path().to_path_buf());
+    a.set_mtime("object", 1_500_000_000_000).unwrap();
+    assert_eq!(mtime(&f), 1_500_000_000_000);
+    assert_eq!(std::fs::read(&f).unwrap(), b"same");
+}
+
+#[test]
 fn remove_handles_files_dirs_and_missing() {
     let t = tempfile::tempdir().unwrap();
     std::fs::create_dir_all(t.path().join("d/node_modules/x")).unwrap();

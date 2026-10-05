@@ -92,9 +92,10 @@ fn ms_to_filetime(ms: i64) -> filetime::FileTime {
     )
 }
 
-/// Windows refuses to delete a read-only file or rename over one, while the
-/// mirror must replace it like any other; elsewhere the folder's permissions
-/// decide and the file's own mode doesn't matter.
+/// Windows refuses to delete a read-only file, rename over one or open one
+/// for writing (which setting its time does), and Git makes its object files
+/// read-only; the mirror must change them like any other. Elsewhere the
+/// file's own mode stops none of these.
 #[cfg(windows)]
 fn make_writable(path: &Path) {
     if let Ok(m) = std::fs::symlink_metadata(path)
@@ -229,6 +230,7 @@ impl Applier {
         if !std::fs::symlink_metadata(&path)?.is_file() {
             return Err(invalid(format!("\"{rel}\" is not a file")));
         }
+        make_writable(&path);
         filetime::set_file_mtime(&path, ms_to_filetime(mtime_ms))
     }
 
