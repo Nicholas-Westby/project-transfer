@@ -7,6 +7,7 @@ use super::projects::{
     wire_project,
 };
 use super::{Applier, Progress, Summary};
+use crate::logging::one_line;
 use crate::manifest::{Change, Entry, Kind};
 use crate::model::{Direction, Folder, Project};
 use crate::net::{Connection, Shared};
@@ -277,9 +278,11 @@ impl Run<'_> {
     /// logged here as well.
     fn fail(&mut self, rel: &str, reason: String) {
         let (here, peer) = (&self.here, self.conn.peer_name());
+        // Escaped, so no file name can break the line.
+        let why = one_line(&reason);
         match self.direction {
-            Direction::Push => warn!("could not push \"{rel}\" from {here} to {peer}: {reason}"),
-            Direction::Pull => warn!("could not pull \"{rel}\" from {peer} to {here}: {reason}"),
+            Direction::Push => warn!("could not push {rel:?} from {here} to {peer}: {why}"),
+            Direction::Pull => warn!("could not pull {rel:?} from {peer} to {here}: {why}"),
         }
         self.summary.failures.push((rel.to_string(), reason));
     }
