@@ -137,16 +137,15 @@ fn project_row(ui: &mut Ui, name: &str, selected: bool) -> egui::Response {
     };
     let color = if selected { pal.ink } else { pal.muted() };
     let width = ui.available_width();
-    ui.add(
-        // The trailing grow atom keeps the name on the left of a wide row.
-        Button::new((RichText::new(name).color(color), egui::Atom::grow()))
-            .fill(fill)
-            .stroke(egui::Stroke::NONE)
-            .corner_radius(CornerRadius::same(CONTROL_RADIUS))
-            .min_size(Vec2::new(width, 30.0))
-            .wrap_mode(egui::TextWrapMode::Truncate),
-    )
-    .on_hover_cursor(egui::CursorIcon::PointingHand)
+    widgets::with_fill(ui, fill, |ui| {
+        ui.add(
+            // The trailing grow atom keeps the name on the left of a wide row.
+            Button::new((RichText::new(name).color(color), egui::Atom::grow()))
+                .corner_radius(CornerRadius::same(CONTROL_RADIUS))
+                .min_size(Vec2::new(width, 30.0))
+                .wrap_mode(egui::TextWrapMode::Truncate),
+        )
+    })
 }
 
 #[cfg(test)]

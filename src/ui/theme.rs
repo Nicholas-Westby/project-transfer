@@ -149,6 +149,8 @@ impl Palette {
         v.weak_text_color = Some(self.faint());
         v.text_cursor.stroke = Stroke::new(2.0, self.route);
         v.text_cursor.blink = false;
+        // Every button shows it can be clicked, not only the frameless ones.
+        v.interact_cursor = Some(egui::CursorIcon::PointingHand);
 
         let w = &mut v.widgets;
         w.noninteractive.bg_fill = self.surface;
@@ -160,8 +162,8 @@ impl Palette {
             (&mut w.inactive, control, Stroke::new(1.0, self.border())),
             (
                 &mut w.hovered,
-                mix(control, self.ink, 0.08),
-                Stroke::new(1.0, mix(self.border(), self.route, 0.6)),
+                mix(control, self.ink, 0.14),
+                Stroke::new(1.0, mix(self.border(), self.route, 0.8)),
             ),
             // Pressed and keyboard-focused widgets share this, so the focus
             // ring is Route.

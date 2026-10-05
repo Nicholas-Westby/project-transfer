@@ -1,9 +1,9 @@
 //! Small building blocks shared by the screens, so buttons and text look the
 //! same everywhere.
 
-use super::theme::{CONTROL_RADIUS, Palette, semibold};
+use super::theme::{CONTROL_RADIUS, Palette, mix, semibold};
 use egui::{
-    Button, Color32, CornerRadius, FontId, Response, RichText, Sense, Ui, Vec2, WidgetInfo,
+    Button, Color32, CornerRadius, FontId, Response, RichText, Sense, Stroke, Ui, Vec2, WidgetInfo,
     WidgetType,
 };
 use std::path::Path;
@@ -12,13 +12,50 @@ use std::path::Path;
 pub fn filled(ui: &mut Ui, enabled: bool, text: &str, fill: Color32, tall: bool) -> Response {
     let pal = Palette::of(ui.ctx());
     let mut b = Button::new(RichText::new(text).color(pal.on_fill()).strong())
-        .fill(fill)
-        .stroke(egui::Stroke::NONE)
         .corner_radius(CornerRadius::same(CONTROL_RADIUS));
     if tall {
         b = b.min_size(Vec2::new(0.0, 36.0));
     }
-    ui.add_enabled(enabled, b)
+    with_fill(ui, fill, |ui| ui.add_enabled(enabled, b))
+}
+
+/// Runs `add` with buttons filled in `rest`, a shade further from it under
+/// the pointer and further still while pressed. A fill set on a button
+/// itself stays the same in every state, so it never showed a hover.
+pub fn with_fill<R>(ui: &mut Ui, rest: Color32, add: impl FnOnce(&mut Ui) -> R) -> R {
+    let pal = Palette::of(ui.ctx());
+    let (hover, press) = if rest.a() == 0 {
+        let shade = |a| match pal.dark {
+            true => Color32::from_white_alpha(a),
+            false => Color32::from_black_alpha(a),
+        };
+        (shade(14), shade(26))
+    } else {
+        let toward = if pal.dark {
+            Color32::WHITE
+        } else {
+            Color32::BLACK
+        };
+        (mix(rest, toward, 0.14), mix(rest, toward, 0.24))
+    };
+    ui.scope(|ui| {
+        let w = &mut ui.visuals_mut().widgets;
+        // A disabled button draws with these too, faded.
+        for (state, fill) in [
+            (&mut w.noninteractive, rest),
+            (&mut w.inactive, rest),
+            (&mut w.hovered, hover),
+            (&mut w.active, press),
+        ] {
+            state.bg_fill = fill;
+            state.weak_bg_fill = fill;
+            state.bg_stroke = Stroke::NONE;
+        }
+        // Keyboard focus shares the pressed look; keep it visible.
+        w.active.bg_stroke = Stroke::new(1.5, pal.ink);
+        add(ui)
+    })
+    .inner
 }
 
 pub fn primary(ui: &mut Ui, text: &str) -> Response {
@@ -35,16 +72,39 @@ pub fn danger(ui: &mut Ui, text: &str) -> Response {
 pub fn quiet(ui: &mut Ui, text: &str, color: Option<Color32>) -> Response {
     let pal = Palette::of(ui.ctx());
     let text = RichText::new(text).color(color.unwrap_or(pal.muted()));
-    ui.add(Button::new(text).frame(false))
-        .on_hover_cursor(egui::CursorIcon::PointingHand)
+    frameless(ui, Button::new(text))
+}
+
+/// Adds a frameless button that gets a backdrop under the pointer and
+/// while pressed. Drawn behind it rather than as a frame, so the button
+/// keeps lining up with the text around it.
+pub fn frameless(ui: &mut Ui, button: Button) -> Response {
+    let backdrop = ui.painter().add(egui::Shape::Noop);
+    let r = ui.add(button.frame(false));
+    // Focus too, so moving through with Tab shows where it is.
+    if r.enabled() && (r.hovered() || r.has_focus() || r.is_pointer_button_down_on()) {
+        let w = &ui.visuals().widgets;
+        let fill = match r.is_pointer_button_down_on() {
+            true => w.active.weak_bg_fill,
+            false => w.hovered.weak_bg_fill,
+        };
+        let rect = r.rect.expand2(Vec2::new(5.0, 2.0));
+        ui.painter().set(
+            backdrop,
+            egui::epaint::RectShape::filled(rect, CornerRadius::same(CONTROL_RADIUS), fill),
+        );
+    }
+    r
 }
 
 /// An icon-only button that still reads as `label` to screen readers.
 pub fn icon_button(ui: &mut Ui, icon: &str, label: &str) -> Response {
     let pal = Palette::of(ui.ctx());
-    let r = ui
-        .add(Button::new(RichText::new(icon).size(17.0).color(pal.ink)).frame(false))
-        .on_hover_text(label);
+    let r = frameless(
+        ui,
+        Button::new(RichText::new(icon).size(17.0).color(pal.ink)),
+    )
+    .on_hover_text(label);
     let label = label.to_string();
     r.widget_info(|| WidgetInfo::labeled(WidgetType::Button, true, &label));
     r
@@ -225,6 +285,29 @@ mod tests {
         assert_eq!(ago(now, now - 5 * 3_600_000), "5 hours ago");
         assert_eq!(ago(now, now - 30 * 3_600_000), "yesterday");
         assert_eq!(ago(now, now - 4 * 86_400_000), "4 days ago");
+    }
+
+    #[test]
+    fn a_filled_button_changes_under_the_pointer_and_when_pressed() {
+        let ctx = egui::Context::default();
+        let mut seen = Vec::new();
+        let mut out = ctx.run_ui(Default::default(), |ui| {
+            for rest in [Color32::from_rgb(90, 150, 230), Color32::TRANSPARENT] {
+                with_fill(ui, rest, |ui| {
+                    let w = &ui.visuals().widgets;
+                    seen.push([
+                        w.inactive.weak_bg_fill,
+                        w.hovered.weak_bg_fill,
+                        w.active.weak_bg_fill,
+                    ]);
+                });
+            }
+        });
+        // Nothing draws this frame; its font textures are not needed.
+        out.textures_delta.clear();
+        for [rest, hover, press] in seen {
+            assert!(rest != hover && hover != press && rest != press);
+        }
     }
 
     #[test]

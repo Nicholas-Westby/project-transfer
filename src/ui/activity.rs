@@ -29,8 +29,9 @@ impl App {
             .show(ui, |ui| {
                 let now = now_ms();
                 ui.horizontal(|ui| {
-                    let r = ui.add(
-                        Button::new(RichText::new("     Activity").color(pal.muted())).frame(false),
+                    let r = widgets::frameless(
+                        ui,
+                        Button::new(RichText::new("     Activity").color(pal.muted())),
                     );
                     let at = egui::pos2(r.rect.left() + 9.0, r.rect.center().y);
                     widgets::chevron(ui, at, self.view.activity_open, pal.muted());

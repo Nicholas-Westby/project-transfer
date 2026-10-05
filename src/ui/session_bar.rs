@@ -106,9 +106,7 @@ impl App {
         let text = RichText::new(format!("{label}     "))
             .font(FontId::new(15.0, semibold()))
             .color(pal.ink);
-        let button = ui
-            .add(Button::new(text).frame(false))
-            .on_hover_cursor(egui::CursorIcon::PointingHand);
+        let button = widgets::frameless(ui, Button::new(text));
         let at = egui::pos2(button.rect.right() - 9.0, button.rect.center().y);
         widgets::chevron(ui, at, true, pal.muted());
         button.widget_info(|| WidgetInfo::labeled(WidgetType::ComboBox, true, "Choose a computer"));
