@@ -85,9 +85,11 @@ impl App {
             ),
             widest(
                 widgets::text_width(ui, head("Here")),
-                here.iter()
-                    .flatten()
-                    .map(|t| widgets::text_width(ui, t.clone())),
+                here.iter().map(|t| match t {
+                    Some(path) => widgets::text_width(ui, path.clone()),
+                    // It wraps, but gets one line when there is room.
+                    None => widgets::text_width(ui, NOT_SET_UP_HERE),
+                }),
             ),
             widest(
                 widgets::text_width(ui, head(&there_head)),
@@ -114,8 +116,14 @@ impl App {
                 for ((f, here), (there, why)) in p.folders.iter().zip(here).zip(there) {
                     cell(ui, name_w, |ui| {
                         ui.horizontal(|ui| {
-                            ui.label(RichText::new(&f.name).color(pal.ink));
-                            if f.id == p.primary {
+                            // The badge stays whole; a long name gives way.
+                            let primary = f.id == p.primary;
+                            let room = if primary { badge } else { 0.0 };
+                            ui.scope(|ui| {
+                                ui.set_max_width((ui.available_width() - room).max(0.0));
+                                ui.label(RichText::new(&f.name).color(pal.ink));
+                            });
+                            if primary {
                                 widgets::badge(ui, "Primary")
                                     .on_hover_text("Commands run in the primary folder.");
                             }
@@ -209,20 +217,26 @@ fn cell<R>(ui: &mut Ui, width: f32, add: impl FnOnce(&mut Ui) -> R) -> R {
 }
 
 /// The widths of the name, here and there columns. Each keeps what it
-/// needs while the table fits; otherwise the paths share what is left,
-/// and a short one keeps its width.
-fn column_widths(available: f32, [name, here, there]: [f32; 3]) -> [f32; 3] {
-    let room = (available - name - MORE - 3.0 * GAP).max(2.0 * MIN_COL);
-    let half = room / 2.0;
-    if here + there <= room {
-        [name, here, there]
-    } else if here <= half {
-        [name, here, room - here]
-    } else if there <= half {
-        [name, room - there, there]
-    } else {
-        [name, half, half]
+/// needs while the table fits; otherwise the widest give way first, down to
+/// one width they share, so short columns keep theirs.
+fn column_widths(available: f32, natural: [f32; 3]) -> [f32; 3] {
+    let room = (available - MORE - 3.0 * GAP).max(3.0 * MIN_COL);
+    if natural.iter().sum::<f32>() <= room {
+        return natural;
     }
+    let mut narrowest_first = natural;
+    narrowest_first.sort_by(f32::total_cmp);
+    let mut left = room;
+    let mut cap = f32::INFINITY;
+    for (i, width) in narrowest_first.into_iter().enumerate() {
+        let share = left / (3 - i) as f32;
+        if width > share {
+            cap = share;
+            break;
+        }
+        left -= width;
+    }
+    natural.map(|w| w.min(cap))
 }
 
 #[cfg(test)]
@@ -230,18 +244,21 @@ mod tests {
     use super::column_widths;
 
     #[test]
-    fn paths_give_up_room_only_when_the_table_does_not_fit() {
+    fn the_widest_columns_give_way_only_when_the_table_does_not_fit() {
         // The "More" button and three gaps take 112 points.
         let cases = [
             // Everything fits: each column keeps what it needs.
             (800.0, [100.0, 300.0, 200.0], [100.0, 300.0, 200.0]),
-            // The short path keeps its width; the long one gets the rest.
+            // The short columns keep their width; the long one gets the rest.
             (590.0, [100.0, 320.0, 120.0], [100.0, 258.0, 120.0]),
             (590.0, [100.0, 120.0, 320.0], [100.0, 120.0, 258.0]),
-            // Both long: they share the room.
+            (590.0, [400.0, 100.0, 120.0], [258.0, 100.0, 120.0]),
+            // Two long ones share what the short one leaves.
             (590.0, [100.0, 320.0, 300.0], [100.0, 189.0, 189.0]),
+            // All long: they share alike.
+            (592.0, [420.0, 320.0, 218.0], [160.0, 160.0, 160.0]),
             // Never narrower than the smallest column.
-            (300.0, [100.0, 320.0, 300.0], [100.0, 80.0, 80.0]),
+            (300.0, [100.0, 320.0, 300.0], [80.0, 80.0, 80.0]),
         ];
         for (available, natural, want) in cases {
             assert_eq!(
