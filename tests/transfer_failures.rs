@@ -1,13 +1,14 @@
 //! Entries a transfer could not apply: the summary says which step failed
-//! and why, both computers log each one, and both activity strips warn.
+//! and why, and both computers log each one.
+//!
+//! Every test here captures the log. One that logs from other threads
+//! (an app core) would decide for these whether a log line is wanted.
 
-mod core_support;
 mod support;
 
-use project_transfer::core::{Action, ActivityKind, AppCore, TransferState};
 use project_transfer::model::Direction;
 use project_transfer::net::Connection;
-use project_transfer::transfer::{self, Preview, Summary, TransferRequest};
+use project_transfer::transfer::{self, Preview, Summary};
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
 use support::*;
@@ -161,65 +162,4 @@ async fn a_pull_logs_what_failed_here_and_what_the_other_computer_could_not_send
     );
     // B, which could not send it.
     assert!(log.warned(&["\"gone.txt\"", &a_name]), "{}", log.text());
-}
-
-/// Previews a push, runs `meanwhile`, then confirms it and waits for the end.
-fn push_through(a: &AppCore, req: &TransferRequest, meanwhile: impl FnOnce()) {
-    a.act(Action::Prepare(req.clone()));
-    core_support::wait(a, "the preview", |s| {
-        matches!(s.transfer, TransferState::Ready(_))
-    });
-    meanwhile();
-    a.act(Action::Execute);
-    core_support::wait(a, "the push to finish", |s| {
-        matches!(s.transfer, TransferState::Finished(_))
-    });
-    a.act(Action::DismissTransfer);
-}
-
-#[test]
-fn both_activity_strips_warn_when_entries_could_not_be_applied() {
-    let (da, db) = (tempfile::tempdir().unwrap(), tempfile::tempdir().unwrap());
-    let (a, b) = core_support::start_pairing(da.path(), db.path());
-    b.act(Action::AnswerPair(Some(core_support::ALL)));
-    a.act(Action::ConfirmPairCode(true));
-    let b_id = b.state().me.id;
-    core_support::wait(&a, "B to be online", |s| {
-        s.peer(b_id).is_some_and(|v| v.online)
-    });
-    let src = da.path().join("src/app");
-    write(&src, "same.txt", "same");
-    a.act(Action::CreateProject {
-        name: "Garden".into(),
-        folder: src.clone(),
-    });
-    a.settle();
-    let req = TransferRequest {
-        peer: b_id,
-        project: a.state().projects[0].id,
-        direction: Direction::Push,
-        send_everything: false,
-    };
-    push_through(&a, &req, || {});
-
-    set_mtime(&src.join("same.txt"), 1_600_000_000_000);
-    push_through(&a, &req, || folder_in_the_way(&db.path().join("Dev/app")));
-
-    let s = a.state();
-    let line = s
-        .activity
-        .iter()
-        .rev()
-        .find(|l| l.text.starts_with("Pushed"));
-    let line = line.expect("a line for the push");
-    assert_eq!(line.kind, ActivityKind::Warn, "{}", line.text);
-    assert!(line.text.contains("1 could not be copied"), "{}", line.text);
-    assert!(line.text.contains("log"), "{}", line.text);
-    core_support::wait(&b, "B to warn about what it refused", |s| {
-        s.activity.iter().any(|l| {
-            l.kind == ActivityKind::Warn
-                && l.text.contains("1 could not be written")
-                && l.text.contains("log")
-        })
-    });
 }
