@@ -69,12 +69,17 @@ fn both_activity_strips_warn_when_entries_could_not_be_applied() {
     let line = line.expect("a line for the push");
     assert_eq!(line.kind, ActivityKind::Warn, "{}", line.text);
     assert!(line.text.contains("1 could not be copied"), "{}", line.text);
-    assert!(line.text.contains("log"), "{}", line.text);
+    // Says where to look, since the summary that listed it closes.
+    assert!(
+        line.text.contains("log folder in Settings"),
+        "{}",
+        line.text
+    );
     wait(&b, "B to warn about what it refused", |s| {
         s.activity.iter().any(|l| {
             l.kind == ActivityKind::Warn
                 && l.text.contains("1 could not be written")
-                && l.text.contains("log")
+                && l.text.contains("log folder in Settings")
         })
     });
 }

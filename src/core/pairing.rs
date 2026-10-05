@@ -260,7 +260,8 @@ impl Core {
                     self.ui.info(text);
                 } else {
                     self.ui.warn(format!(
-                        "{text} {failed} could not be written; the log lists each one and why."
+                        "{text} {failed} could not be written; open the log folder in \
+                         Settings to see why."
                     ));
                 }
             }
