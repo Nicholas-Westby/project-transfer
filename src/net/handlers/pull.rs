@@ -8,7 +8,7 @@ use crate::transfer::projects::{StartedBy, record_transfer};
 use crate::transfer::safe_join;
 use anyhow::bail;
 use tokio::io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt};
-use tracing::info;
+use tracing::{info, warn};
 
 /// Replies `FileHeader` then exactly `size` raw bytes, or `Refused`.
 pub async fn get_file<S: AsyncRead + AsyncWrite + Unpin>(
@@ -38,7 +38,11 @@ pub async fn get_file<S: AsyncRead + AsyncWrite + Unpin>(
     .await;
     let (file, meta) = match opened {
         Ok(x) => x,
-        Err(reason) => return write_msg(stream, &refused(reason)).await,
+        Err(reason) => {
+            // The computer pulling lists it only until its summary closes.
+            warn!("could not send \"{rel}\" to {}: {reason}", ctx.peer.name);
+            return write_msg(stream, &refused(reason)).await;
+        }
     };
     let size = meta.len();
     let header = Response::FileHeader {

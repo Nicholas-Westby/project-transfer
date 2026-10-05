@@ -22,7 +22,7 @@ use tracing::warn;
 mod ops;
 mod stream;
 
-use ops::Op;
+use super::Op;
 
 const CANCELLED: &str = "The transfer was cancelled. Files already copied stay in place.";
 
@@ -41,6 +41,8 @@ pub async fn execute(
         summary: Summary::default(),
         bytes_done: 0,
         last_progress: Instant::now(),
+        direction: preview.request.direction,
+        here: String::new(),
     };
     match run.all(shared, &preview).await {
         Ok(()) => {
@@ -63,6 +65,9 @@ struct Run<'a> {
     summary: Summary,
     bytes_done: u64,
     last_progress: Instant,
+    direction: Direction,
+    /// The current folder as it is on this computer, for the log.
+    here: String,
 }
 
 /// Where the current folder's files come from and go to.
@@ -217,6 +222,10 @@ impl Run<'_> {
     }
 
     async fn folder(&mut self, side: &Side, fp: &FolderPreview) -> anyhow::Result<()> {
+        self.here = match side {
+            Side::Push(root) => root.display().to_string(),
+            Side::Pull(a, ..) => a.root().display().to_string(),
+        };
         let changes = &fp.plan.changes;
         for c in changes.iter().filter(|c| is_dir_change(c)) {
             let rel = written_rel(c);
@@ -264,7 +273,14 @@ impl Run<'_> {
         Ok(())
     }
 
+    /// The summary that lists failures closes for good, so each one is
+    /// logged here as well.
     fn fail(&mut self, rel: &str, reason: String) {
+        let (here, peer) = (&self.here, self.conn.peer_name());
+        match self.direction {
+            Direction::Push => warn!("could not push \"{rel}\" from {here} to {peer}: {reason}"),
+            Direction::Pull => warn!("could not pull \"{rel}\" from {peer} to {here}: {reason}"),
+        }
         self.summary.failures.push((rel.to_string(), reason));
     }
 }

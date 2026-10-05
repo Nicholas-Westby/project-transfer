@@ -14,11 +14,13 @@ use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
 use tokio::sync::{RwLock, mpsc};
 
+/// (project, peer, files, failed) from one `NetEvent::Received`.
+pub type Received = (ProjectId, uuid::Uuid, u64, u64);
+
 pub struct Instance {
     pub shared: Shared,
     pub addr: SocketAddr,
-    /// (project, peer, files) from each `NetEvent::Received`.
-    pub received: Arc<Mutex<Vec<(ProjectId, uuid::Uuid, u64)>>>,
+    pub received: Arc<Mutex<Vec<Received>>>,
     dir: tempfile::TempDir,
 }
 
@@ -68,7 +70,8 @@ impl Instance {
                         project,
                         peer,
                         files,
-                    } => r.lock().unwrap().push((project, peer, files)),
+                        failed,
+                    } => r.lock().unwrap().push((project, peer, files, failed)),
                     _ => {}
                 }
             }

@@ -167,7 +167,13 @@ impl Core {
             }
             let state = match result {
                 Ok(summary) => {
-                    core.ui.info(done_sentence(req.direction, &peer, &summary));
+                    let text = done_sentence(req.direction, &peer, &summary);
+                    // A warning stands out in the strip and in the log.
+                    if summary.failures.is_empty() {
+                        core.ui.info(text);
+                    } else {
+                        core.ui.warn(text);
+                    }
                     TransferState::Finished(summary)
                 }
                 Err(e) => {
@@ -242,7 +248,7 @@ pub(super) fn done_sentence(d: Direction, peer: &str, s: &Summary) -> String {
     }
     if !s.failures.is_empty() {
         text.push_str(&format!(
-            " {} could not be copied; the summary says why.",
+            " {} could not be copied; the log lists each one and why.",
             s.failures.len()
         ));
     }

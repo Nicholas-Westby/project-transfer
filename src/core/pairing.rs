@@ -243,6 +243,7 @@ impl Core {
                 project,
                 peer,
                 files,
+                failed,
             } => {
                 self.sync_projects().await;
                 let (what, who) = {
@@ -254,10 +255,14 @@ impl Core {
                             .map_or("a paired computer".into(), |v| v.peer.name.clone()),
                     )
                 };
-                self.ui.info(format!(
-                    "Received {} for `{what}` from {who}.",
-                    files_word(files)
-                ));
+                let text = format!("Received {} for `{what}` from {who}.", files_word(files));
+                if failed == 0 {
+                    self.ui.info(text);
+                } else {
+                    self.ui.warn(format!(
+                        "{text} {failed} could not be written; the log lists each one and why."
+                    ));
+                }
             }
             NetEvent::Log(text) => self.ui.info(text),
         }
