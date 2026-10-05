@@ -1,6 +1,7 @@
 //! The source side of a pull.
 
 use super::{Ctx, refused, stored_root};
+use crate::logging::one_line;
 use crate::manifest::{is_exec, mtime_ms};
 use crate::model::{Direction, FolderId, ProjectId};
 use crate::protocol::{Response, write_msg};
@@ -19,11 +20,12 @@ pub async fn get_file<S: AsyncRead + AsyncWrite + Unpin>(
     rel: &str,
 ) -> anyhow::Result<()> {
     let me = ctx.shared.settings.read().await.name.clone();
+    let root = stored_root(ctx.shared, project, folder).await;
     let opened = async {
-        let root = stored_root(ctx.shared, project, folder)
-            .await
+        let root = root
+            .as_ref()
             .ok_or_else(|| format!("{me} has no folder set up for this project."))?;
-        let path = safe_join(&root, rel).map_err(|e| e.to_string())?;
+        let path = safe_join(root, rel).map_err(|e| e.to_string())?;
         let not_file = || format!("\"{rel}\" is not a file on {me}.");
         let meta = std::fs::symlink_metadata(&path).map_err(|_| not_file())?;
         if !meta.is_file() {
@@ -40,7 +42,14 @@ pub async fn get_file<S: AsyncRead + AsyncWrite + Unpin>(
         Ok(x) => x,
         Err(reason) => {
             // The computer pulling lists it only until its summary closes.
-            warn!("could not send \"{rel}\" to {}: {reason}", ctx.peer.name);
+            let (peer, why) = (&ctx.peer.name, one_line(&reason));
+            match &root {
+                Some(root) => warn!(
+                    "could not send {rel:?} from {} to {peer}: {why}",
+                    root.display()
+                ),
+                None => warn!("could not send {rel:?} to {peer}: {why}"),
+            }
             return write_msg(stream, &refused(reason)).await;
         }
     };

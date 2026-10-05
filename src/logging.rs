@@ -32,9 +32,26 @@ pub fn init(logs_dir: &Path) -> anyhow::Result<WorkerGuard> {
     Ok(guard)
 }
 
+/// `text` with its line breaks escaped, for a reason that may quote a file
+/// name, so each warning stays one line to read and search.
+pub fn one_line(text: &str) -> std::borrow::Cow<'_, str> {
+    if text.contains(['\n', '\r']) {
+        text.replace('\n', "\\n").replace('\r', "\\r").into()
+    } else {
+        text.into()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn only_line_breaks_are_escaped() {
+        assert_eq!(one_line("two\nlines\r\n"), "two\\nlines\\r\\n");
+        let plain = "\"same.txt\" is not a file";
+        assert_eq!(one_line(plain), plain);
+    }
 
     #[test]
     fn writes_events_to_a_dated_file_in_the_logs_folder() {

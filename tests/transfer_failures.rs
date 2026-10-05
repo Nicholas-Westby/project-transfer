@@ -160,6 +160,41 @@ async fn a_pull_logs_what_failed_here_and_what_the_other_computer_could_not_send
         "{}",
         log.text()
     );
-    // B, which could not send it.
-    assert!(log.warned(&["\"gone.txt\"", &a_name]), "{}", log.text());
+    // B, which could not send it from its folder.
+    let theirs = theirs.display().to_string();
+    assert!(
+        log.warned(&["\"gone.txt\"", &theirs, &a_name]),
+        "{}",
+        log.text()
+    );
+}
+
+#[cfg(unix)]
+#[tokio::test]
+async fn a_name_with_a_line_break_stays_on_one_log_line() {
+    let (log, _guard) = Log::start();
+    let (a, b) = pair_full().await;
+    let src = a.project_dir("app");
+    write(&src, "same.txt", "same");
+    let p = a.add_project("Garden", &[("app", &src)]).await;
+    push(&a, &b, p.id, false).await;
+    let dest = b.dev().join("app");
+
+    // Such names are legal here, and the other computer sends what it has.
+    std::fs::rename(src.join("same.txt"), src.join("two\nlines.txt")).unwrap();
+    std::fs::rename(dest.join("same.txt"), dest.join("two\nlines.txt")).unwrap();
+    set_mtime(&src.join("two\nlines.txt"), 1_600_000_000_000);
+    let mut conn = a.open(&b).await;
+    let req = a.request(&b, p.id, Direction::Push).await;
+    let preview = transfer::prepare(&mut conn, &a.shared, req).await.unwrap();
+    std::fs::remove_file(dest.join("two\nlines.txt")).unwrap();
+    std::fs::create_dir(dest.join("two\nlines.txt")).unwrap();
+    run(&mut conn, &a, preview).await;
+
+    // Each warning, its reason included, on a line of its own.
+    let (a_name, b_name) = (name(&a).await, name(&b).await);
+    for who in [&b_name, &a_name] {
+        let whole = [r#""two\nlines.txt""#, who, "is not a file"];
+        assert!(log.warned(&whole), "{}", log.text());
+    }
 }

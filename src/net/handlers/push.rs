@@ -1,6 +1,7 @@
 //! The receiving side of a push.
 
 use super::{Ctx, SessionState, refused};
+use crate::logging::one_line;
 use crate::model::{Direction, Project, ProjectId};
 use crate::net::NetEvent;
 use crate::protocol::{Request, Response};
@@ -60,14 +61,14 @@ fn apply(ctx: &Ctx<'_>, state: &mut SessionState, rel: &str, op: Op<'_>) -> Resp
 /// The computer that pushed lists a refusal only until its summary closes,
 /// so each one is counted and logged here as well.
 fn refuse(ctx: &Ctx<'_>, state: &mut SessionState, rel: &str, reason: String) -> Response {
-    let peer = &ctx.peer.name;
+    let (peer, why) = (&ctx.peer.name, one_line(&reason));
     match &mut state.push {
         Some(push) => {
             push.failed += 1;
             let root = push.applier.root().display();
-            warn!("could not apply \"{rel}\" from {peer} to {root}: {reason}");
+            warn!("could not apply {rel:?} from {peer} to {root}: {why}");
         }
-        None => warn!("could not apply \"{rel}\" from {peer}: {reason}"),
+        None => warn!("could not apply {rel:?} from {peer}: {why}"),
     }
     refused(reason)
 }
