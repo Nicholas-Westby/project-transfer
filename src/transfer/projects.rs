@@ -143,7 +143,9 @@ pub fn adopt(
         primary: incoming.primary,
         commands: Vec::new(),
         last_transfer: None,
+        description: Default::default(),
     });
+    next.description = next.description.newer(&incoming.description);
     for f in &incoming.folders {
         if !next.folders.iter().any(|x| x.id == f.id) {
             next.folders.push(Folder {

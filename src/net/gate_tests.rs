@@ -29,6 +29,7 @@ fn project() -> crate::model::Project {
         primary: u(),
         commands: vec![],
         last_transfer: None,
+        description: Default::default(),
     }
 }
 

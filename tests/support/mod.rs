@@ -121,6 +121,7 @@ impl Instance {
             folders,
             commands: vec![],
             last_transfer: None,
+            description: Default::default(),
         };
         self.put_project(p.clone()).await;
         p

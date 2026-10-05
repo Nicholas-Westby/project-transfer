@@ -123,4 +123,78 @@ pub struct Project {
     pub primary: FolderId,
     pub commands: Vec<Command>,
     pub last_transfer: Option<TransferRecord>,
+    #[serde(default)]
+    pub description: Description,
+}
+
+/// Free text about a project. It travels with the project on a transfer,
+/// and the newer edit wins, so pushing never undoes a later edit there.
+#[derive(Clone, Debug, Default, Serialize, Deserialize, PartialEq)]
+pub struct Description {
+    pub text: String,
+    /// When it was last edited; 0 for never.
+    pub at_ms: i64,
+}
+
+/// Long enough for notes, short enough to stay a description. Held to on
+/// every way in, the other computer included.
+pub const MAX_DESCRIPTION_CHARS: usize = 4000;
+
+impl Description {
+    /// `other` when it was edited later than this one, cut to length.
+    pub fn newer(&self, other: &Description) -> Description {
+        if other.at_ms > self.at_ms {
+            Description {
+                text: other.text.chars().take(MAX_DESCRIPTION_CHARS).collect(),
+                at_ms: other.at_ms,
+            }
+        } else {
+            self.clone()
+        }
+    }
+
+    /// Whether this one, sent over, would change `dest`'s text.
+    pub fn replaces(&self, dest: &Description) -> bool {
+        self.at_ms > dest.at_ms && self.text != dest.text
+    }
+
+    /// An edit made now. Stamped after the one it replaces even when this
+    /// computer's clock is behind the one that made that, so an edit made
+    /// after seeing the other computer's text always wins over it.
+    pub fn edited(text: &str, previous: &Description, now_ms: i64) -> Description {
+        Description {
+            text: text.chars().take(MAX_DESCRIPTION_CHARS).collect(),
+            at_ms: now_ms.max(previous.at_ms + 1),
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn an_edit_is_stamped_after_the_text_it_replaces() {
+        // That text came from a computer whose clock runs ahead.
+        let ahead = Description {
+            text: "From the other computer".into(),
+            at_ms: 1_000,
+        };
+        let mine = Description::edited("Mine", &ahead, 400);
+        assert_eq!(mine.at_ms, 1_001);
+        assert_eq!(ahead.newer(&mine), mine);
+        assert_eq!(Description::edited("Later", &mine, 5_000).at_ms, 5_000);
+    }
+
+    #[test]
+    fn a_description_from_elsewhere_is_cut_to_length() {
+        let long = Description {
+            text: "x".repeat(MAX_DESCRIPTION_CHARS + 50),
+            at_ms: 2,
+        };
+        let kept = Description::default().newer(&long);
+        assert_eq!(kept.text.chars().count(), MAX_DESCRIPTION_CHARS);
+        assert!(long.replaces(&Description::default()));
+        assert!(!Description::default().replaces(&long));
+    }
 }

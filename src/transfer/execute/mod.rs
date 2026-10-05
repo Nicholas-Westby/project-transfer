@@ -202,6 +202,7 @@ impl Run<'_> {
             primary: info.primary,
             commands: Vec::new(),
             last_transfer: None,
+            description: info.description,
         };
         let chosen: HashMap<_, _> = preview
             .folders

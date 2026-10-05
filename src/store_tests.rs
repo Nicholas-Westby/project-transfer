@@ -50,6 +50,10 @@ fn sample_project() -> Project {
             files: 3,
             by_peer: false,
         }),
+        description: Description {
+            text: "Plans the beds.\nWaters on Mondays.".into(),
+            at_ms: 7,
+        },
     }
 }
 

@@ -19,6 +19,7 @@ fn project(name: &str, folders: &[&str]) -> Project {
         folders,
         commands: vec![],
         last_transfer: None,
+        description: Default::default(),
     }
 }
 
@@ -33,6 +34,7 @@ fn info(p: &Project) -> RemoteProject {
     RemoteProject {
         name: p.name.clone(),
         primary: p.primary,
+        description: Default::default(),
         folders: p
             .folders
             .iter()

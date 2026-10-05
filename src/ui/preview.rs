@@ -224,6 +224,7 @@ mod tests {
             }],
             warnings: vec![],
             link: None,
+            description: false,
         }
     }
 

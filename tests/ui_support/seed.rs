@@ -7,8 +7,8 @@ use project_transfer::core::{
 };
 use project_transfer::manifest::{Change, Entry, Kind, Plan};
 use project_transfer::model::{
-    Command, Direction, Folder, InstanceSettings, Os, Peer, Permissions, Project, ThemeChoice,
-    TransferRecord,
+    Command, Description, Direction, Folder, InstanceSettings, Os, Peer, Permissions, Project,
+    ThemeChoice, TransferRecord,
 };
 use project_transfer::protocol::{RemoteFolder, RemoteProject};
 use project_transfer::transfer::{FolderPreview, Preview, TransferRequest};
@@ -122,6 +122,13 @@ pub fn seeded_state() -> UiState {
                 files: 42,
                 by_peer: false,
             }),
+            description: Description {
+                text: "Plans which vegetables go in which raised bed each season, and \
+                       reminds us when to water, feed and harvest them.\nSeed list: \
+                       https://example.com/garden-planner/seeds/2026/spring-and-summer-beds"
+                    .into(),
+                at_ms: 1,
+            },
         },
         Project {
             id: id(11),
@@ -130,6 +137,7 @@ pub fn seeded_state() -> UiState {
             primary: id(23),
             commands: vec![],
             last_transfer: None,
+            description: Default::default(),
         },
     ];
     s.remote_projects.insert(
@@ -149,6 +157,7 @@ pub fn seeded_state() -> UiState {
                 },
             ],
             primary: id(20),
+            description: Default::default(),
         },
     );
     // Only on the peer, so the project list offers to pull it.
@@ -162,6 +171,7 @@ pub fn seeded_state() -> UiState {
                 path: Some("D:\\dev\\seed-catalog".into()),
             }],
             primary: id(24),
+            description: Default::default(),
         },
     );
     let out = |t: &str, stderr| OutputLine {
@@ -278,6 +288,7 @@ pub fn sample_preview(s: &UiState) -> Preview {
                 .into(),
         ],
         link: None,
+        description: false,
     }
 }
 
