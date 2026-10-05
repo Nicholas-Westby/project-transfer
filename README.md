@@ -5,7 +5,8 @@ folders between your computers on the same local network. Open it on two
 computers, pair them once, and from then on push or pull a project with one
 button. The app finds the other computer by itself, talks to it over its own
 encrypted connection, and shows you every change before it writes anything.
-There is nothing to set up in a terminal.
+
+![Project Transfer main window](assets/images/project-transfer.webp)
 
 ## Install
 
@@ -73,36 +74,14 @@ Pairing is only needed once. The two computers recognize each other by their
 certificates from then on, and a connection from a computer with a changed
 certificate is refused.
 
-### Through a computer both are paired with
-
-A computer the others can't reach directly, such as a virtual machine on its
-host's private network, can be reached through a computer both are paired
-with, while Project Transfer runs there. Pair each of the two with that
-computer first. That computer must also find each of them itself, as it
-finds any computer: on its network, where it lists them under **On this
-network** before pairing, or added there by address. Then, with it selected,
-the other one shows up under **On this network** in Computers as "through
-*name*". If nothing shows up, add the other one by address on the computer in
-the middle. Pair with it as usual, and push and pull work as usual too. The
-computer in the middle passes the encrypted connection along and can't read
-it, and it only does so between computers it's paired with.
-
 ## Projects and folders
 
 A project is a name plus one or more folders that move together. Each computer
 picks its own folder for each one, with the normal folder picker, so the paths
 can differ (`~/Dev/garden` on a Mac, `D:\dev\garden` on Windows).
 
-- Under a project's name is its description, a box you can type notes
-  into over several lines. It saves when you click away, and Esc undoes
-  your changes. It travels with the project on a push or pull, and the
-  newer edit wins, so an older copy never overwrites a newer one.
-- A project's name is a label and can be anything. A project with several
-  folders is kept in a folder named after it on other computers, with
-  characters some systems don't allow left out (`What Next?` becomes
-  `What Next`).
-- Folder names become folder names on every paired computer, so folders
-  named with `/` or `\`, or with names Windows can't hold (`CON`, `a:b`, a
+- Project and folder names become folder names on every paired computer, so
+  names with `/` or `\`, or names Windows can't hold (`CON`, `a:b`, a
   trailing dot), are refused with the reason.
 - Your home folder and the top of a disk can't be project folders: a mirror
   of them would rewrite everything on them.
@@ -112,12 +91,6 @@ can differ (`~/Dev/garden` on a Mac, `D:\dev\garden` on Windows).
   **Projects folder** from Settings (`~/Dev` on macOS, `%USERPROFILE%\Dev` on
   Windows). A single-folder project lands in `<Projects folder>/<folder>`; a
   project with several folders in `<Projects folder>/<project>/<folder>`.
-- Projects with the same name on two computers are the same project, even
-  when each computer created its own (case and outer spaces don't count).
-  Folders with the same name are matched too, so a push or pull goes into
-  the folder that computer already has, and the preview says it matched
-  them. This only happens when each computer has just one project of that
-  name. Folders with different names are never mirrored onto each other.
 - If that path already belongs to another project, the app adds a number
   instead of mixing the two: `app` becomes `app 2`, then `app 3`.
 - The preview always shows the path a new folder will get, and you can change
@@ -235,17 +208,6 @@ Set `PROJECT_TRANSFER_HOME` to a folder to keep everything there instead.
 This is how two copies run side by side on one computer.
 
 ## Development
-
-Turn on the version hook once in each clone:
-
-```
-cargo xtask hooks
-```
-
-Every commit then counts the last part of the version up (0.1.4 becomes
-0.1.5) and includes the change, so each commit has its own version. The app
-shows it next to the settings cog. Change the first two parts in `Cargo.toml`
-by hand when a release deserves it.
 
 ```
 cargo fmt --check
