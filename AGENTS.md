@@ -2,6 +2,7 @@
 
 Rust desktop app (egui) that mirrors project folders between computers on a LAN.
 What the app does and how to use it: `README.md`.
+How to do local development: `DEVELOPMENT.md`.
 
 ## Constraints
 
