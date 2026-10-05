@@ -1,4 +1,4 @@
-//! Push and Pull, each with the one-line reason when it cannot run.
+//! Pull and Push, each with the one-line reason when it cannot run.
 
 use super::theme::Palette;
 use super::widgets;
@@ -52,7 +52,7 @@ impl App {
         // One shared reason reads once, under both buttons.
         let shared = reasons[0].is_some() && reasons[0] == reasons[1];
         ui.columns(2, |cols| {
-            for (ui, dir) in cols.iter_mut().zip([Direction::Push, Direction::Pull]) {
+            for (ui, dir) in cols.iter_mut().zip([Direction::Pull, Direction::Push]) {
                 let reason = reasons[dir as usize].clone();
                 let label = match dir {
                     Direction::Push => format!("Push to {peer}"),
