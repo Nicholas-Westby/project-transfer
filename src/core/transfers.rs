@@ -248,7 +248,7 @@ pub(super) fn done_sentence(d: Direction, peer: &str, s: &Summary) -> String {
     }
     if !s.failures.is_empty() {
         text.push_str(&format!(
-            " {} could not be copied; the log lists each one and why.",
+            " {} could not be copied; open the log folder in Settings to see why.",
             s.failures.len()
         ));
     }
