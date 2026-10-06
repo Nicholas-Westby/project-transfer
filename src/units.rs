@@ -9,7 +9,8 @@ pub fn size(n: u64) -> String {
     }
     let mut v = n as f64 / 1000.0;
     let mut unit = 0;
-    while v >= 1000.0 && unit < UNITS.len() - 1 {
+    // Judged by the rounded value, or 999.96 KB would print as "1000.0 KB".
+    while (v * 10.0).round() >= 10_000.0 && unit < UNITS.len() - 1 {
         v /= 1000.0;
         unit += 1;
     }
@@ -18,7 +19,8 @@ pub fn size(n: u64) -> String {
 
 /// How long something took: tenths only while they still matter.
 pub fn took(d: Duration) -> String {
-    if d < Duration::from_secs(10) {
+    // Not up to 10 s: 9.96 s would print as "10.0 s".
+    if d < Duration::from_millis(9_950) {
         return format!("{:.1} s", d.as_secs_f64());
     }
     clock(Duration::from_secs_f64(d.as_secs_f64().round()))
@@ -76,11 +78,24 @@ mod tests {
     }
 
     #[test]
+    fn a_size_that_rounds_up_to_the_next_unit_is_written_in_it() {
+        assert_eq!(size(999_949), "999.9 KB");
+        assert_eq!(size(999_999), "1.0 MB");
+        assert_eq!(size(999_999_999), "1.0 GB");
+    }
+
+    #[test]
     fn short_times_keep_a_tenth_and_long_ones_read_in_minutes() {
         assert_eq!(took(Duration::from_millis(3_100)), "3.1 s");
         assert_eq!(took(Duration::from_millis(42_400)), "42 s");
         assert_eq!(took(Duration::from_millis(2_409_300)), "40 min 9 s");
         assert_eq!(took(s(3_900)), "1 h 5 min");
+    }
+
+    #[test]
+    fn a_time_that_rounds_up_to_ten_seconds_has_no_tenth() {
+        assert_eq!(took(Duration::from_millis(9_940)), "9.9 s");
+        assert_eq!(took(Duration::from_millis(9_960)), "10 s");
     }
 
     #[test]
