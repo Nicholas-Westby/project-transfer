@@ -232,10 +232,10 @@ pub(super) fn done_sentence(d: Direction, peer: &str, s: &Summary) -> String {
         Direction::Pull => "from",
     };
     let mut text = format!(
-        "{} {} {dir} {peer} in {:.1} s.",
+        "{} {} {dir} {peer} in {}.",
         verb(d, true),
         files_word(s.files),
-        s.took_ms as f64 / 1000.0
+        crate::units::took(std::time::Duration::from_millis(s.took_ms))
     );
     if s.removed > 0 {
         text.push_str(&format!(
