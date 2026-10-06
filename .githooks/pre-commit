@@ -1,5 +1,5 @@
 #!/bin/sh
-# Every commit carries the next version number and a fresh words.txt. Turned
-# on per clone with `cargo xtask hooks`; the work is done in
+# Every commit carries the next version number and fresh word and phrase
+# lists. Turned on per clone with `cargo xtask hooks`; the work is done in
 # xtask/src/version.rs and xtask/src/word_list.rs.
 exec cargo xtask pre-commit

@@ -1,9 +1,10 @@
 //! Keeps `words.txt` (every word in the repository's text files) and
-//! `word-changes.txt` (the words this commit adds or removes) up to date. The
-//! pre-commit hook runs this so a reviewer can spot odd terms in a commit
-//! without reading the whole diff.
+//! `word-changes.txt` (the words this commit adds or removes) up to date,
+//! and likewise `phrases.txt` and `phrase-changes.txt`. The pre-commit hook
+//! runs this so a reviewer can spot odd terms in a commit without reading
+//! the whole diff.
 
-use crate::words::words_in;
+use crate::words::Found;
 use anyhow::{Context, Result, bail};
 use std::collections::BTreeSet;
 use std::io::{BufRead, BufReader, Read, Write};
@@ -11,31 +12,54 @@ use std::path::Path;
 use std::process::{Command, Stdio};
 
 pub const WORDS: &str = "words.txt";
-pub const CHANGES: &str = "word-changes.txt";
+pub const WORD_CHANGES: &str = "word-changes.txt";
+pub const PHRASES: &str = "phrases.txt";
+pub const PHRASE_CHANGES: &str = "phrase-changes.txt";
 
 /// Paths left out. Only files git tracks are read, so build output and
 /// `.git` are out already; these are tracked but generated.
-const EXCLUDED: [&str; 3] = [WORDS, CHANGES, "Cargo.lock"];
+const EXCLUDED: [&str; 5] = [WORDS, WORD_CHANGES, PHRASES, PHRASE_CHANGES, "Cargo.lock"];
 
-/// Rewrites both files from what is staged and stages them. Returns how many
-/// words were added and removed.
-pub fn refresh(root: &Path) -> Result<(usize, usize)> {
-    let mut words = BTreeSet::new();
+/// How many entries a refresh added to and removed from each list.
+pub struct Counts {
+    pub words: (usize, usize),
+    pub phrases: (usize, usize),
+}
+
+/// Rewrites the word and phrase lists from what is staged and stages them.
+pub fn refresh(root: &Path) -> Result<Counts> {
+    let mut found = Found::default();
     for (path, text) in staged_text_files(root)? {
-        words.extend(words_in(&text, uses_escapes(&path)));
+        found.read(&text, uses_escapes(&path));
     }
-    let before: BTreeSet<String> = committed(root, WORDS)?.lines().map(str::to_owned).collect();
-    let changes = changes(&before, &words);
-    write(&root.join(WORDS), &lines(words.iter().map(String::as_str)))?;
-    let mut staged = vec![WORDS];
-    // A commit that changes no words leaves the last list of changes alone,
-    // so the file only shows up in commits it describes.
+    let (words, phrases) = found.lists();
+    Ok(Counts {
+        words: update(root, WORDS, WORD_CHANGES, &words)?,
+        phrases: update(root, PHRASES, PHRASE_CHANGES, &phrases)?,
+    })
+}
+
+/// Rewrites one list and, when its entries differ from the last commit's,
+/// its file of changes, then stages them. Returns how many entries were
+/// added and removed.
+fn update(
+    root: &Path,
+    list: &str,
+    changes_file: &str,
+    entries: &BTreeSet<String>,
+) -> Result<(usize, usize)> {
+    let before: BTreeSet<String> = committed(root, list)?.lines().map(str::to_owned).collect();
+    let changes = changes(&before, entries);
+    write(&root.join(list), &lines(sorted(entries)))?;
+    let mut staged = vec![list];
+    // A commit that changes none of the entries leaves the last changes
+    // alone, so the file only shows up in commits it describes.
     if !changes.is_empty() {
         write(
-            &root.join(CHANGES),
+            &root.join(changes_file),
             &lines(changes.iter().map(String::as_str)),
         )?;
-        staged.push(CHANGES);
+        staged.push(changes_file);
     }
     let mut args = vec!["add", "--"];
     args.extend(staged);
@@ -44,17 +68,29 @@ pub fn refresh(root: &Path) -> Result<(usize, usize)> {
     Ok((added, changes.len() - added))
 }
 
-/// `+word` for each new word and `-word` for each gone one, in word order.
+/// `+entry` for each new entry and `-entry` for each gone one, in list order.
 pub fn changes(before: &BTreeSet<String>, after: &BTreeSet<String>) -> Vec<String> {
     let mut out: Vec<(&str, char)> = after
         .difference(before)
         .map(|w| (w.as_str(), '+'))
         .collect();
     out.extend(before.difference(after).map(|w| (w.as_str(), '-')));
-    out.sort();
+    out.sort_by_cached_key(|&(w, _)| order(w));
     out.into_iter()
         .map(|(w, sign)| format!("{sign}{w}"))
         .collect()
+}
+
+fn sorted(entries: &BTreeSet<String>) -> impl Iterator<Item = &str> {
+    let mut sorted: Vec<&str> = entries.iter().map(String::as_str).collect();
+    sorted.sort_by_cached_key(|&entry| order(entry));
+    sorted.into_iter()
+}
+
+/// Alphabetical whatever the case, so `macOS` sits among the m's rather than
+/// after every capital. Entries that differ only in case put capitals first.
+fn order(entry: &str) -> (String, &str) {
+    (entry.to_lowercase(), entry)
 }
 
 pub fn excluded(path: &str) -> bool {
@@ -164,22 +200,43 @@ mod tests {
     }
 
     #[test]
+    fn orders_changes_alphabetically_whatever_the_case() {
+        let before = set(&["kiwi"]);
+        let after = set(&["Zebra", "macOS", "MacOS"]);
+        assert_eq!(
+            changes(&before, &after),
+            ["-kiwi", "+MacOS", "+macOS", "+Zebra"]
+        );
+    }
+
+    #[test]
     fn leaves_out_generated_files_and_binaries() {
         assert!(excluded("words.txt") && excluded("word-changes.txt") && excluded("Cargo.lock"));
+        assert!(excluded("phrases.txt") && excluded("phrase-changes.txt"));
         assert!(!excluded("README.md") && !excluded("docs/words.txt"));
         assert_eq!(as_text(b"\x00\x01font".to_vec()), None);
         assert_eq!(as_text(vec![0xff, 0xfe]), None);
         assert_eq!(as_text(b"plain".to_vec()).as_deref(), Some("plain"));
     }
 
+    /// An empty git repository in a temporary folder.
+    fn repo() -> tempfile::TempDir {
+        let dir = tempfile::tempdir().unwrap();
+        for args in [
+            &["init", "-q"][..],
+            &["config", "user.email", "t@example.com"],
+            &["config", "user.name", "t"],
+        ] {
+            crate::version::git(dir.path(), args).unwrap();
+        }
+        dir
+    }
+
     #[test]
     fn reads_only_what_is_staged() {
-        let dir = tempfile::tempdir().unwrap();
+        let dir = repo();
         let root = dir.path();
         let git = |args: &[&str]| crate::version::git(root, args).unwrap();
-        git(&["init", "-q"]);
-        git(&["config", "user.email", "t@example.com"]);
-        git(&["config", "user.name", "t"]);
         std::fs::write(root.join(".gitignore"), "ignored.txt\n").unwrap();
         std::fs::write(root.join("ignored.txt"), "secretword").unwrap();
         std::fs::write(root.join("untracked.md"), "untrackedword").unwrap();
@@ -189,19 +246,51 @@ mod tests {
         // Unstaged edits are not part of the commit and must not count.
         std::fs::write(root.join("a.md"), "Hello one-time world unstagedword").unwrap();
 
-        assert_eq!(refresh(root).unwrap(), (5, 0));
+        assert_eq!(refresh(root).unwrap().words, (5, 0));
         let words = std::fs::read_to_string(root.join(WORDS)).unwrap();
         assert_eq!(words, "hello\nignored\none-time\ntxt\nworld\n");
-        let changes = std::fs::read_to_string(root.join(CHANGES)).unwrap();
+        let changes = std::fs::read_to_string(root.join(WORD_CHANGES)).unwrap();
         assert!(changes.starts_with("+hello\n+ignored\n"));
         git(&["commit", "-q", "-m", "first"]);
 
         std::fs::write(root.join("a.md"), "Hello there").unwrap();
         git(&["add", "a.md"]);
-        assert_eq!(refresh(root).unwrap(), (1, 2));
-        let changes = std::fs::read_to_string(root.join(CHANGES)).unwrap();
+        assert_eq!(refresh(root).unwrap().words, (1, 2));
+        let changes = std::fs::read_to_string(root.join(WORD_CHANGES)).unwrap();
         assert_eq!(changes, "-one-time\n+there\n-world\n");
         let staged = git(&["diff", "--cached", "--name-only"]);
         assert_eq!(staged, "a.md\nword-changes.txt\nwords.txt\n");
+    }
+
+    #[test]
+    fn lists_phrases_and_the_latest_phrase_changes() {
+        let dir = repo();
+        let root = dir.path();
+        let git = |args: &[&str]| crate::version::git(root, args).unwrap();
+        let read = |file: &str| std::fs::read_to_string(root.join(file)).unwrap();
+        let stage = |text: &str| {
+            std::fs::write(root.join("a.md"), text).unwrap();
+            git(&["add", "a.md"]);
+        };
+        // History from before the phrase list existed, as in this repository.
+        stage("Hello");
+        git(&["commit", "-q", "-m", "before phrases"]);
+        stage("WorldPeeps on macOS");
+        assert_eq!(refresh(root).unwrap().phrases, (2, 0));
+        assert_eq!(read(PHRASES), "macOS\nWorldPeeps\n");
+        assert_eq!(read(PHRASE_CHANGES), "+macOS\n+WorldPeeps\n");
+        git(&["commit", "-q", "-m", "first"]);
+
+        // New words alone leave the last phrase changes where they are.
+        stage("WorldPeeps live on macOS");
+        assert_eq!(refresh(root).unwrap().phrases, (0, 0));
+        let staged = git(&["diff", "--cached", "--name-only"]);
+        assert_eq!(staged, "a.md\nword-changes.txt\nwords.txt\n");
+        git(&["commit", "-q", "-m", "second"]);
+
+        stage("Hello");
+        assert_eq!(refresh(root).unwrap().phrases, (0, 2));
+        assert_eq!(read(PHRASES), "");
+        assert_eq!(read(PHRASE_CHANGES), "-macOS\n-WorldPeeps\n");
     }
 }
