@@ -7,7 +7,9 @@ use super::{App, dialogs, preview, preview_view};
 use crate::core::{Action, TransferState, UiState};
 use crate::model::Direction;
 use crate::transfer::{Preview, Summary};
+use crate::units::{size, speed, took};
 use egui::{ProgressBar, RichText, Ui};
+use std::time::Duration;
 
 const WIDTH: f32 = 680.0;
 
@@ -94,8 +96,8 @@ impl App {
                         ui,
                         format!(
                             "{} of {}, {}",
-                            bytes(*done),
-                            bytes(*total),
+                            size(*done),
+                            size(*total),
                             plural(*files, "file", "files")
                         ),
                     );
@@ -183,9 +185,8 @@ fn finished(ui: &mut Ui, sum: &Summary, dir: Direction, peer: &str) {
         Direction::Push => format!("Pushed {} to {peer}", plural(sum.files, "file", "files")),
         Direction::Pull => format!("Pulled {} from {peer}", plural(sum.files, "file", "files")),
     };
-    ui.label(
-        RichText::new(format!("{verb} in {:.1} s.", sum.took_ms as f64 / 1000.0)).color(pal.ink),
-    );
+    let elapsed = Duration::from_millis(sum.took_ms);
+    ui.label(RichText::new(format!("{verb} in {}.", took(elapsed))).color(pal.ink));
     if sum.removed > 0 {
         widgets::muted(
             ui,
@@ -195,7 +196,11 @@ fn finished(ui: &mut Ui, sum: &Summary, dir: Direction, peer: &str) {
             ),
         );
     }
-    widgets::small_muted(ui, format!("{} sent.", bytes(sum.bytes)));
+    let sent = match speed(sum.bytes, elapsed) {
+        Some(rate) => format!("{} sent at {rate}.", size(sum.bytes)),
+        None => format!("{} sent.", size(sum.bytes)),
+    };
+    widgets::small_muted(ui, sent);
     if !sum.failures.is_empty() {
         ui.add_space(8.0);
         ui.label(
@@ -224,30 +229,4 @@ fn cancel_row(ui: &mut Ui, label: &str) -> bool {
 fn done_row(ui: &mut Ui) -> bool {
     ui.add_space(12.0);
     dialogs::right_row(ui, |ui| widgets::primary(ui, "Done").clicked()).inner
-}
-
-pub fn bytes(n: u64) -> String {
-    const UNITS: [&str; 4] = ["KB", "MB", "GB", "TB"];
-    if n < 1000 {
-        return format!("{n} bytes");
-    }
-    let mut v = n as f64 / 1000.0;
-    let mut unit = 0;
-    while v >= 1000.0 && unit < UNITS.len() - 1 {
-        v /= 1000.0;
-        unit += 1;
-    }
-    format!("{v:.1} {}", UNITS[unit])
-}
-
-#[cfg(test)]
-mod tests {
-    use super::bytes;
-
-    #[test]
-    fn byte_sizes_read_simply() {
-        assert_eq!(bytes(12), "12 bytes");
-        assert_eq!(bytes(1_500), "1.5 KB");
-        assert_eq!(bytes(2_300_000), "2.3 MB");
-    }
 }

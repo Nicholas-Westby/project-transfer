@@ -240,3 +240,20 @@ fn execute_without_a_preview_is_refused() {
     assert_eq!(f.core.state().transfer, TransferState::Idle);
     assert!(f.last_activity().text.contains("no preview"));
 }
+
+#[test]
+fn the_activity_line_for_a_finished_transfer_tells_the_time_in_minutes() {
+    let said = |took_ms| {
+        let summary = crate::transfer::Summary {
+            files: 25_731,
+            took_ms,
+            ..Default::default()
+        };
+        transfers::done_sentence(crate::model::Direction::Push, "Windows PC", &summary)
+    };
+    assert_eq!(
+        said(2_409_300),
+        "Pushed 25731 files to Windows PC in 40 min 9 s."
+    );
+    assert_eq!(said(3_100), "Pushed 25731 files to Windows PC in 3.1 s.");
+}
