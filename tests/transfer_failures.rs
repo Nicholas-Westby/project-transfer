@@ -198,3 +198,83 @@ async fn a_name_with_a_line_break_stays_on_one_log_line() {
         assert!(log.warned(&whole), "{}", log.text());
     }
 }
+
+/// Names that sort in the order they were made, so a batch keeps its order.
+fn numbered(i: u32) -> String {
+    format!("f{i:02}.txt")
+}
+
+/// The batch is bigger than the window, so answers are read while later
+/// requests go out; each refusal must still name its own entry.
+fn assert_only_failed(s: &Summary, stuck: &[u32]) {
+    let failed: Vec<&str> = s.failures.iter().map(|(rel, _)| rel.as_str()).collect();
+    let want: Vec<String> = stuck.iter().map(|&i| numbered(i)).collect();
+    assert_eq!(failed, want);
+    assert_eq!(s.files, 40 - stuck.len() as u64);
+}
+
+#[tokio::test]
+async fn refusals_among_many_pushed_changes_name_the_right_entries() {
+    let (log, _guard) = Log::start();
+    let (a, b) = pair_full().await;
+    let src = a.project_dir("app");
+    for i in 0..40 {
+        write(&src, &numbered(i), "same");
+    }
+    let p = a.add_project("Garden", &[("app", &src)]).await;
+    push(&a, &b, p.id, false).await;
+    let dest = b.dev().join("app");
+
+    // Only times change, so each entry is a small request of its own.
+    for i in 0..40 {
+        set_mtime(
+            &src.join(numbered(i)),
+            1_600_000_000_000 + i64::from(i) * 1000,
+        );
+    }
+    let mut conn = a.open(&b).await;
+    let req = a.request(&b, p.id, Direction::Push).await;
+    let preview = transfer::prepare(&mut conn, &a.shared, req).await.unwrap();
+    // Some cannot be applied there, spread across the whole batch.
+    let stuck = [3, 17, 34, 39];
+    for i in stuck {
+        let file = dest.join(numbered(i));
+        std::fs::remove_file(&file).unwrap();
+        std::fs::create_dir(&file).unwrap();
+    }
+    let summary = run(&mut conn, &a, preview).await;
+
+    assert_only_failed(&summary, &stuck);
+    let (src, b_name) = (src.display().to_string(), name(&b).await);
+    for i in stuck {
+        let rel = format!("\"{}\"", numbered(i));
+        assert!(log.warned(&[&rel, &src, &b_name]), "{}", log.text());
+    }
+}
+
+#[tokio::test]
+async fn a_pull_names_the_right_files_among_many_the_other_computer_lost() {
+    let (_log, _guard) = Log::start();
+    let (a, b) = pair_full().await;
+    let theirs = b.project_dir("app");
+    for i in 0..40 {
+        write(&theirs, &numbered(i), &format!("content {i}"));
+    }
+    let p = b.add_project("Garden", &[("app", &theirs)]).await;
+    let mut conn = a.open(&b).await;
+    let req = a.request(&b, p.id, Direction::Pull).await;
+    let preview = transfer::prepare(&mut conn, &a.shared, req).await.unwrap();
+    // Gone after the preview, so asking for them is refused.
+    let gone = [3, 17, 34, 39];
+    for i in gone {
+        std::fs::remove_file(theirs.join(numbered(i))).unwrap();
+    }
+    let summary = run(&mut conn, &a, preview).await;
+
+    assert_only_failed(&summary, &gone);
+    // Each file that did arrive holds its own content.
+    let mine = a.dev().join("app");
+    for i in (0..40).filter(|i| !gone.contains(i)) {
+        assert_eq!(read(&mine, &numbered(i)), format!("content {i}"));
+    }
+}

@@ -14,6 +14,8 @@ use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
 use tokio::sync::{RwLock, mpsc};
 
+pub mod delay;
+
 /// (project, peer, files, failed) from one `NetEvent::Received`.
 pub type Received = (ProjectId, uuid::Uuid, u64, u64);
 

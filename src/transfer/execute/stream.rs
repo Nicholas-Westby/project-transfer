@@ -1,5 +1,6 @@
 //! Streaming file content in 256 KiB chunks, either direction.
 
+use super::window::{Awaiting, Counts};
 use super::{CANCELLED, Run, Side};
 use crate::manifest::{is_exec, mtime_ms};
 use crate::model::{FolderId, ProjectId};
@@ -26,21 +27,22 @@ impl Run<'_> {
     }
 
     pub(super) async fn file(&mut self, side: &Side, rel: &str) -> anyhow::Result<()> {
-        self.tick(rel, true);
         match side {
-            Side::Push(root) => self.send_file(root, rel).await,
-            Side::Pull(a, project, folder) => self.fetch_file(a, *project, *folder, rel).await,
+            Side::Push(root) => self.send_file(side, root, rel).await,
+            Side::Pull(_, project, folder) => self.ask_for_file(side, *project, *folder, rel).await,
         }
     }
 
-    /// Mid-file there is no way to stop the peer waiting for the rest, so
-    /// cancelling closes the connection and the peer discards its temp file.
-    async fn abort_mid_file(&mut self, why: String) -> anyhow::Error {
+    /// The peer works through everything already sent, and mid-file it waits
+    /// for the rest, so stopping early closes the connection; the peer then
+    /// discards any file it has not finished.
+    pub(super) async fn abort(&mut self, why: String) -> anyhow::Error {
         self.conn.close().await;
         anyhow::anyhow!(why)
     }
 
-    async fn send_file(&mut self, root: &Path, rel: &str) -> anyhow::Result<()> {
+    async fn send_file(&mut self, side: &Side, root: &Path, rel: &str) -> anyhow::Result<()> {
+        self.tick(rel, true);
         let opened = safe_join(root, rel).and_then(|p| {
             let f = std::fs::File::open(&p)?;
             let meta = f.metadata()?;
@@ -64,18 +66,19 @@ impl Run<'_> {
             mtime_ms: mtime_ms(&meta),
             exec: is_exec(&meta),
         };
+        self.room(side).await?;
         self.conn.send(&put).await?;
         let mut buf = vec![0u8; CHUNK];
         let mut left = size;
         while left > 0 {
             if self.cancel.is_cancelled() {
-                return Err(self.abort_mid_file(CANCELLED.into()).await);
+                return Err(self.abort(CANCELLED.into()).await);
             }
             let want = left.min(CHUNK as u64) as usize;
             let n = match f.read(&mut buf[..want]) {
                 Ok(0) | Err(_) => {
                     let why = format!("\"{rel}\" changed while it was being sent. Try again.");
-                    return Err(self.abort_mid_file(why).await);
+                    return Err(self.abort(why).await);
                 }
                 Ok(n) => n,
             };
@@ -84,30 +87,38 @@ impl Run<'_> {
             self.bytes_done += n as u64;
             self.tick(rel, false);
         }
-        match self.conn.recv().await? {
-            Response::Ok => {
-                self.summary.files += 1;
-                self.summary.bytes += size;
-            }
-            Response::Refused { reason } => self.fail(rel, reason),
-            other => return Err(unexpected(self.conn, "a file", other)),
-        }
+        self.in_flight.push_back(Awaiting::Answer {
+            rel: rel.into(),
+            counts: Counts::File(size),
+            what: "a file",
+        });
         Ok(())
     }
 
-    async fn fetch_file(
+    /// Asks for a file without waiting for it; it is written when its turn
+    /// in the answers comes.
+    async fn ask_for_file(
         &mut self,
-        a: &Applier,
+        side: &Side,
         project: ProjectId,
         folder: FolderId,
         rel: &str,
     ) -> anyhow::Result<()> {
+        self.room(side).await?;
         let get = Request::GetFile {
             project,
             folder,
             rel: rel.into(),
         };
-        let (size, mtime_ms, exec) = match self.conn.request(&get).await? {
+        self.conn.send(&get).await?;
+        self.in_flight.push_back(Awaiting::File { rel: rel.into() });
+        Ok(())
+    }
+
+    /// Writes the next file the peer sends: the oldest one asked for.
+    pub(super) async fn receive_file(&mut self, a: &Applier, rel: &str) -> anyhow::Result<()> {
+        self.tick(rel, true);
+        let (size, mtime_ms, exec) = match self.answer().await? {
             Response::FileHeader {
                 size,
                 mtime_ms,
@@ -130,7 +141,7 @@ impl Run<'_> {
         let mut left = size;
         while left > 0 {
             if self.cancel.is_cancelled() {
-                return Err(self.abort_mid_file(CANCELLED.into()).await);
+                return Err(self.abort(CANCELLED.into()).await);
             }
             let want = left.min(CHUNK as u64) as usize;
             let n = self.conn.read_raw(&mut buf[..want]).await?;
