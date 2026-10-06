@@ -57,7 +57,10 @@ fn a_running_transfer_shows_elapsed_and_remaining_time() {
             total: 10_000_000_000,
             files: 25_731,
             current: "src/a.txt".into(),
-            started: Instant::now() - Duration::from_secs(754),
+            // A Windows clock counts from boot, so it may not reach back that far.
+            started: Instant::now()
+                .checked_sub(Duration::from_secs(754))
+                .unwrap_or_else(Instant::now),
             left: Some(Duration::from_secs(1_500)),
         }
     });

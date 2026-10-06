@@ -177,7 +177,10 @@ mod tests {
         .unwrap();
         let ui = StateHandle::new(UiState::new(me, 0), None);
         // Past the settling time, so a second sample is all an estimate needs.
-        let started = Instant::now() - Duration::from_secs(10);
+        // A Windows clock counts from boot, so it may not reach back that far.
+        let started = Instant::now()
+            .checked_sub(Duration::from_secs(10))
+            .unwrap_or_else(Instant::now);
         ui.update(|s| {
             s.transfer = TransferState::Running {
                 done: 0,

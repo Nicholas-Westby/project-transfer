@@ -71,7 +71,10 @@ pub fn all(dir: &Path) {
                 total: 9_800_000,
                 files: 42,
                 current: "app/src/plants/tomato.rs".into(),
-                started: Instant::now() - Duration::from_secs(754),
+                // A Windows clock counts from boot, so it may not reach back that far.
+                started: Instant::now()
+                    .checked_sub(Duration::from_secs(754))
+                    .unwrap_or_else(Instant::now),
                 left: Some(Duration::from_secs(1_500)),
             }
         });
