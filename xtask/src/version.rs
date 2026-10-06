@@ -105,7 +105,7 @@ pub fn install_hooks(root: &Path) -> Result<()> {
     git(root, &["config", "core.hooksPath", ".githooks"]).map(|_| ())
 }
 
-fn git(root: &Path, args: &[&str]) -> Result<String> {
+pub fn git(root: &Path, args: &[&str]) -> Result<String> {
     let out = Command::new("git")
         .current_dir(root)
         .args(args)

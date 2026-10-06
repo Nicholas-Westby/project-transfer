@@ -1,0 +1,207 @@
+//! Keeps `words.txt` (every word in the repository's text files) and
+//! `word-changes.txt` (the words this commit adds or removes) up to date. The
+//! pre-commit hook runs this so a reviewer can spot odd terms in a commit
+//! without reading the whole diff.
+
+use crate::words::words_in;
+use anyhow::{Context, Result, bail};
+use std::collections::BTreeSet;
+use std::io::{BufRead, BufReader, Read, Write};
+use std::path::Path;
+use std::process::{Command, Stdio};
+
+pub const WORDS: &str = "words.txt";
+pub const CHANGES: &str = "word-changes.txt";
+
+/// Paths left out. Only files git tracks are read, so build output and
+/// `.git` are out already; these are tracked but generated.
+const EXCLUDED: [&str; 3] = [WORDS, CHANGES, "Cargo.lock"];
+
+/// Rewrites both files from what is staged and stages them. Returns how many
+/// words were added and removed.
+pub fn refresh(root: &Path) -> Result<(usize, usize)> {
+    let mut words = BTreeSet::new();
+    for (path, text) in staged_text_files(root)? {
+        words.extend(words_in(&text, uses_escapes(&path)));
+    }
+    let before: BTreeSet<String> = committed(root, WORDS)?.lines().map(str::to_owned).collect();
+    let changes = changes(&before, &words);
+    write(&root.join(WORDS), &lines(words.iter().map(String::as_str)))?;
+    let mut staged = vec![WORDS];
+    // A commit that changes no words leaves the last list of changes alone,
+    // so the file only shows up in commits it describes.
+    if !changes.is_empty() {
+        write(
+            &root.join(CHANGES),
+            &lines(changes.iter().map(String::as_str)),
+        )?;
+        staged.push(CHANGES);
+    }
+    let mut args = vec!["add", "--"];
+    args.extend(staged);
+    crate::version::git(root, &args)?;
+    let added = changes.iter().filter(|c| c.starts_with('+')).count();
+    Ok((added, changes.len() - added))
+}
+
+/// `+word` for each new word and `-word` for each gone one, in word order.
+pub fn changes(before: &BTreeSet<String>, after: &BTreeSet<String>) -> Vec<String> {
+    let mut out: Vec<(&str, char)> = after
+        .difference(before)
+        .map(|w| (w.as_str(), '+'))
+        .collect();
+    out.extend(before.difference(after).map(|w| (w.as_str(), '-')));
+    out.sort();
+    out.into_iter()
+        .map(|(w, sign)| format!("{sign}{w}"))
+        .collect()
+}
+
+pub fn excluded(path: &str) -> bool {
+    EXCLUDED.contains(&path)
+}
+
+/// Rust and TOML strings use backslash escapes.
+fn uses_escapes(path: &str) -> bool {
+    path.ends_with(".rs") || path.ends_with(".toml")
+}
+
+fn lines<'a>(items: impl Iterator<Item = &'a str>) -> String {
+    items.map(|w| format!("{w}\n")).collect()
+}
+
+/// Temp file then rename, so an interrupted run never leaves half a list.
+fn write(path: &Path, text: &str) -> Result<()> {
+    let temp = path.with_extension("txt.tmp");
+    std::fs::write(&temp, text).with_context(|| format!("could not write {}", temp.display()))?;
+    std::fs::rename(&temp, path).with_context(|| format!("could not replace {}", path.display()))
+}
+
+/// The file as of the last commit, or empty before it exists.
+fn committed(root: &Path, path: &str) -> Result<String> {
+    let has_head = crate::version::git(root, &["rev-parse", "--verify", "--quiet", "HEAD"]).is_ok();
+    if !has_head {
+        return Ok(String::new());
+    }
+    Ok(crate::version::git(root, &["show", &format!("HEAD:{path}")]).unwrap_or_default())
+}
+
+/// Each staged file that is text, read from the index rather than the working
+/// tree, so a partly staged file counts only what will be committed.
+fn staged_text_files(root: &Path) -> Result<Vec<(String, String)>> {
+    let listed = crate::version::git(root, &["ls-files", "-z", "--cached"])?;
+    let paths: Vec<String> = listed
+        .split('\0')
+        .filter(|p| !p.is_empty() && !excluded(p) && !p.contains('\n'))
+        .map(str::to_owned)
+        .collect();
+    let mut child = Command::new("git")
+        .current_dir(root)
+        .args(["cat-file", "--batch"])
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .spawn()
+        .context("could not run git cat-file")?;
+    let mut stdin = child.stdin.take().context("git cat-file has no input")?;
+    let requests: String = paths.iter().map(|p| format!(":{p}\n")).collect();
+    // Written from another thread: git answers as it reads, and a full output
+    // pipe would otherwise stop both sides.
+    let writer = std::thread::spawn(move || stdin.write_all(requests.as_bytes()));
+    let mut out = BufReader::new(child.stdout.take().context("git cat-file has no output")?);
+    let mut files = Vec::new();
+    for path in paths {
+        let mut header = String::new();
+        out.read_line(&mut header)?;
+        let fields: Vec<&str> = header.split_whitespace().collect();
+        let [_, kind, size] = fields.as_slice() else {
+            // "missing": a submodule or a path git can't show; nothing to read.
+            continue;
+        };
+        let size: usize = size
+            .parse()
+            .with_context(|| format!("odd git header {header:?}"))?;
+        let mut body = vec![0; size + 1];
+        out.read_exact(&mut body)?;
+        body.pop();
+        if *kind == "blob"
+            && let Some(text) = as_text(body)
+        {
+            files.push((path, text));
+        }
+    }
+    writer.join().expect("writer thread panicked")?;
+    if !child.wait()?.success() {
+        bail!("git cat-file failed");
+    }
+    Ok(files)
+}
+
+/// Fonts, images and other binary files have a zero byte or aren't UTF-8.
+fn as_text(bytes: Vec<u8>) -> Option<String> {
+    if bytes.contains(&0) {
+        return None;
+    }
+    String::from_utf8(bytes).ok()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn set(words: &[&str]) -> BTreeSet<String> {
+        words.iter().map(|w| w.to_string()).collect()
+    }
+
+    #[test]
+    fn lists_added_and_removed_words_in_word_order() {
+        let before = set(&["apple", "kiwi", "pear"]);
+        let after = set(&["banana", "kiwi", "zucchini"]);
+        assert_eq!(
+            changes(&before, &after),
+            ["-apple", "+banana", "-pear", "+zucchini"]
+        );
+        assert!(changes(&after, &after).is_empty());
+    }
+
+    #[test]
+    fn leaves_out_generated_files_and_binaries() {
+        assert!(excluded("words.txt") && excluded("word-changes.txt") && excluded("Cargo.lock"));
+        assert!(!excluded("README.md") && !excluded("docs/words.txt"));
+        assert_eq!(as_text(b"\x00\x01font".to_vec()), None);
+        assert_eq!(as_text(vec![0xff, 0xfe]), None);
+        assert_eq!(as_text(b"plain".to_vec()).as_deref(), Some("plain"));
+    }
+
+    #[test]
+    fn reads_only_what_is_staged() {
+        let dir = tempfile::tempdir().unwrap();
+        let root = dir.path();
+        let git = |args: &[&str]| crate::version::git(root, args).unwrap();
+        git(&["init", "-q"]);
+        git(&["config", "user.email", "t@example.com"]);
+        git(&["config", "user.name", "t"]);
+        std::fs::write(root.join(".gitignore"), "ignored.txt\n").unwrap();
+        std::fs::write(root.join("ignored.txt"), "secretword").unwrap();
+        std::fs::write(root.join("untracked.md"), "untrackedword").unwrap();
+        std::fs::write(root.join("a.md"), "Hello one-time world").unwrap();
+        std::fs::write(root.join("b.bin"), b"binaryword\x00").unwrap();
+        git(&["add", ".gitignore", "a.md", "b.bin"]);
+        // Unstaged edits are not part of the commit and must not count.
+        std::fs::write(root.join("a.md"), "Hello one-time world unstagedword").unwrap();
+
+        assert_eq!(refresh(root).unwrap(), (5, 0));
+        let words = std::fs::read_to_string(root.join(WORDS)).unwrap();
+        assert_eq!(words, "hello\nignored\none-time\ntxt\nworld\n");
+        let changes = std::fs::read_to_string(root.join(CHANGES)).unwrap();
+        assert!(changes.starts_with("+hello\n+ignored\n"));
+        git(&["commit", "-q", "-m", "first"]);
+
+        std::fs::write(root.join("a.md"), "Hello there").unwrap();
+        git(&["add", "a.md"]);
+        assert_eq!(refresh(root).unwrap(), (1, 2));
+        let changes = std::fs::read_to_string(root.join(CHANGES)).unwrap();
+        assert_eq!(changes, "-one-time\n+there\n-world\n");
+        let staged = git(&["diff", "--cached", "--name-only"]);
+        assert_eq!(staged, "a.md\nword-changes.txt\nwords.txt\n");
+    }
+}

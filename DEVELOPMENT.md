@@ -22,3 +22,10 @@ On Windows PowerShell, set the variable first with
 port by itself, and the two find each other within a few seconds.
 
 `cargo xtask icon` redraws `assets/icon.png` and `assets/icon.ico`.
+
+`words.txt` lists every word in the files git tracks, one per line, and
+`word-changes.txt` lists the words a commit added (`+word`) or removed
+(`-word`). The pre-commit hook rewrites both, reading what is staged, so a
+commit's diff shows its new and dropped terms in one short file. Run
+`cargo xtask words` to refresh them by hand. Binary files, `Cargo.lock` and
+the two lists themselves are left out.

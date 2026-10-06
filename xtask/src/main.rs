@@ -1,21 +1,26 @@
-//! Project tooling: `cargo xtask install`, `icon`, `bump-version` and `hooks`.
+//! Project tooling: `cargo xtask install`, `icon`, `bump-version`, `words`,
+//! `pre-commit` and `hooks`.
 
 mod icon;
 mod mac;
 mod version;
 mod windows;
+mod word_list;
+mod words;
 
 use anyhow::{Context, Result, bail};
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
-const USAGE: &str = "usage: cargo xtask <command>\n\n  install [--dest <folder>]   build the app and install it\n  icon                        render assets/icon.png (and icon.ico)\n  bump-version                count the version up and stage it (the pre-commit hook runs this)\n  hooks                       turn on the pre-commit hook for this clone";
+const USAGE: &str = "usage: cargo xtask <command>\n\n  install [--dest <folder>]   build the app and install it\n  icon                        render assets/icon.png (and icon.ico)\n  bump-version                count the version up and stage it\n  words                       rewrite words.txt and word-changes.txt and stage them\n  pre-commit                  bump-version, then words (the pre-commit hook runs this)\n  hooks                       turn on the pre-commit hook for this clone";
 
 #[derive(Debug, PartialEq)]
 enum Task {
     Install { dest: Option<PathBuf> },
     Icon,
     BumpVersion,
+    Words,
+    PreCommit,
     Hooks,
 }
 
@@ -23,6 +28,8 @@ fn parse_args(args: &[String]) -> Result<Task> {
     match args.first().map(String::as_str) {
         Some("icon") if args.len() == 1 => Ok(Task::Icon),
         Some("bump-version") if args.len() == 1 => Ok(Task::BumpVersion),
+        Some("words") if args.len() == 1 => Ok(Task::Words),
+        Some("pre-commit") if args.len() == 1 => Ok(Task::PreCommit),
         Some("hooks") if args.len() == 1 => Ok(Task::Hooks),
         Some("install") => {
             let mut dest = None;
@@ -46,14 +53,14 @@ fn main() -> Result<()> {
     let args: Vec<String> = std::env::args().skip(1).collect();
     match parse_args(&args)? {
         Task::Icon => icon::render_files(&repo_root()),
-        Task::BumpVersion => {
-            let v = version::bump(&repo_root())?;
-            println!("Version {v}");
-            Ok(())
-        }
+        Task::BumpVersion => bump_version(),
+        Task::Words => refresh_words(),
+        Task::PreCommit => bump_version().and_then(|()| refresh_words()),
         Task::Hooks => {
             version::install_hooks(&repo_root())?;
-            println!("Every commit in this clone now counts the version up.");
+            println!(
+                "Every commit in this clone now counts the version up and refreshes words.txt."
+            );
             Ok(())
         }
         Task::Install { dest } => {
@@ -69,6 +76,18 @@ fn main() -> Result<()> {
             }
         }
     }
+}
+
+fn bump_version() -> Result<()> {
+    let v = version::bump(&repo_root())?;
+    println!("Version {v}");
+    Ok(())
+}
+
+fn refresh_words() -> Result<()> {
+    let (added, removed) = word_list::refresh(&repo_root())?;
+    println!("Words: {added} added, {removed} removed");
+    Ok(())
 }
 
 fn repo_root() -> PathBuf {
@@ -162,6 +181,8 @@ mod tests {
             Task::BumpVersion
         );
         assert_eq!(parse_args(&args(&["hooks"])).unwrap(), Task::Hooks);
+        assert_eq!(parse_args(&args(&["words"])).unwrap(), Task::Words);
+        assert_eq!(parse_args(&args(&["pre-commit"])).unwrap(), Task::PreCommit);
         assert_eq!(
             parse_args(&args(&["install"])).unwrap(),
             Task::Install { dest: None }
