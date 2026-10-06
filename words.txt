@@ -201,6 +201,7 @@ alphabetic
 alphanumeric
 already
 also
+alters
 always
 amber
 ambiguous
@@ -918,6 +919,7 @@ draw
 drawing
 drawn
 draws
+drew
 drive
 driven
 drop
@@ -1671,6 +1673,7 @@ loopback
 loopback's
 lose
 loses
+lossless
 lossy
 lost
 low
@@ -1696,6 +1699,7 @@ machines
 macos
 macs
 made
+made-up
 main
 major
 make
@@ -1781,6 +1785,7 @@ mit
 mix
 mix-up
 mixing
+mock
 mod
 modal
 modals
@@ -2289,6 +2294,8 @@ reader
 readers
 reading
 readme
+readme's
+readme-shot
 readonly
 reads
 ready
@@ -2405,6 +2412,7 @@ required
 requirement
 requoted
 rerun-if-changed
+reruns
 res
 reserve
 reserved
