@@ -8,6 +8,7 @@ mod found;
 mod pairing;
 mod peers;
 mod poll;
+mod progress;
 mod projects;
 mod reach;
 mod runs;

@@ -4,10 +4,22 @@ mod ui_support;
 
 use egui_kittest::kittest::{NodeT, Queryable};
 use project_transfer::core::{ActivityKind, ActivityLine, TransferState};
+use std::time::{Duration, Instant};
 use ui_support::{FakeBackend, NoPicker, SIZE, build};
 
 /// The smallest window `main` allows.
 const SMALLEST: [f32; 2] = [900.0, 600.0];
+
+fn running(current: &str, left: Option<Duration>) -> TransferState {
+    TransferState::Running {
+        done: 5_400_000_000,
+        total: 10_000_000_000,
+        files: 25_731,
+        current: current.into(),
+        started: Instant::now(),
+        left,
+    }
+}
 
 #[test]
 fn pull_comes_before_push() {
@@ -92,20 +104,14 @@ fn a_long_path_keeps_the_transfer_sheet_the_same_height() {
         "{}{name}",
         "src/garden-planner/assets/images/seed-catalog/".repeat(8)
     );
-    let running = |current: &str| TransferState::Running {
-        done: 5_400_000_000,
-        total: 10_000_000_000,
-        files: 25_731,
-        current: current.into(),
-    };
     // Each display scale rounds a row of text to whole pixels in its own way.
     for ppp in [1.0, 1.5, 2.25] {
         let fake = FakeBackend::seeded();
-        fake.update(|s| s.transfer = running("src/a.txt"));
+        fake.update(|s| s.transfer = running("src/a.txt", None));
         let mut h = build(fake.clone(), Box::new(NoPicker), SIZE, ppp, false);
         h.run();
         let short = h.get_by_label("Cancel transfer").rect();
-        fake.update(|s| s.transfer = running(&long));
+        fake.update(|s| s.transfer = running(&long, None));
         h.run();
         let cancel = h.get_by_label("Cancel transfer").rect();
         assert_eq!(cancel, short, "at {ppp} pixels per point");
@@ -116,5 +122,23 @@ fn a_long_path_keeps_the_transfer_sheet_the_same_height() {
             .value()
             .unwrap_or_default();
         assert!(shown.contains('…') && shown.ends_with(name), "{shown}");
+    }
+}
+
+/// The estimate only comes a few seconds in; the time line is there from the
+/// start, so the button does not move when it arrives.
+#[test]
+fn the_estimate_arriving_keeps_the_transfer_sheet_the_same_height() {
+    for ppp in [1.0, 1.5, 2.25] {
+        let fake = FakeBackend::seeded();
+        fake.update(|s| s.transfer = running("src/a.txt", None));
+        let mut h = build(fake.clone(), Box::new(NoPicker), SIZE, ppp, false);
+        h.run();
+        let before = h.get_by_label("Cancel transfer").rect();
+        let left = Some(Duration::from_secs(1_500));
+        fake.update(|s| s.transfer = running("src/a.txt", left));
+        h.run();
+        let after = h.get_by_label("Cancel transfer").rect();
+        assert_eq!(after, before, "at {ppp} pixels per point");
     }
 }

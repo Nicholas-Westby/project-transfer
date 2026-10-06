@@ -9,6 +9,7 @@ use crate::transfer::{Preview, Summary};
 use std::collections::HashMap;
 use std::net::SocketAddr;
 use std::sync::{Arc, Mutex, MutexGuard};
+use std::time::{Duration, Instant};
 
 /// The activity strip shows recent lines; older ones live in the log file.
 pub const ACTIVITY_CAP: usize = 500;
@@ -88,6 +89,10 @@ pub enum TransferState {
         total: u64,
         files: u64,
         current: String,
+        /// When it began, for the elapsed time.
+        started: Instant,
+        /// The estimate of the time still needed, once there is one.
+        left: Option<Duration>,
     },
     Finished(Summary),
     Failed(String),

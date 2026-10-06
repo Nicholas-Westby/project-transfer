@@ -2,17 +2,31 @@
 
 use super::theme::Palette;
 use super::widgets::{self, plural};
-use crate::units::size;
+use crate::units::{about, clock, size};
 use egui::text::{LayoutJob, TextWrapping};
 use egui::{Align, Galley, Label, Layout, ProgressBar, TextFormat, TextStyle, Ui, vec2};
 use std::sync::Arc;
+use std::time::{Duration, Instant};
 
 /// Rows the current path may take. The box is always this tall, so the
 /// sheet, pinned at the top, keeps its height as paths come and go.
 const PATH_ROWS: usize = 3;
 
+/// How often the clock is redrawn when no progress arrives. egui takes a
+/// frame's length off such a wait, and egui_kittest's frame is a quarter of a
+/// second, so a wait of that or less never lets its `run` settle.
+const CLOCK_TICK: Duration = Duration::from_millis(500);
+
 /// The sheet's content; true when Cancel was clicked.
-pub(super) fn body(ui: &mut Ui, done: u64, total: u64, files: u64, current: &str) -> bool {
+pub(super) fn body(
+    ui: &mut Ui,
+    done: u64,
+    total: u64,
+    files: u64,
+    current: &str,
+    started: Instant,
+    left: Option<Duration>,
+) -> bool {
     let frac = if total == 0 {
         0.0
     } else {
@@ -29,6 +43,9 @@ pub(super) fn body(ui: &mut Ui, done: u64, total: u64, files: u64, current: &str
             plural(files, "file", "files")
         ),
     );
+    widgets::small_muted(ui, time_line(started.elapsed(), left));
+    // The clock moves even while no progress arrives.
+    ui.ctx().request_repaint_after(CLOCK_TICK);
     path_box(ui, current);
     widgets::small_muted(
         ui,
@@ -36,6 +53,16 @@ pub(super) fn body(ui: &mut Ui, done: u64, total: u64, files: u64, current: &str
     );
     ui.add_space(12.0);
     super::dialogs::right_row(ui, |ui| ui.button("Cancel transfer").clicked()).inner
+}
+
+/// "12 min 34 s elapsed, about 25 min left". The estimate joins in once there
+/// is one; the line itself is always there, so the sheet keeps its height.
+fn time_line(elapsed: Duration, left: Option<Duration>) -> String {
+    let mut line = format!("{} elapsed", clock(elapsed));
+    if let Some(left) = left {
+        line.push_str(&format!(", {} left", about(left)));
+    }
+    line
 }
 
 fn path_box(ui: &mut Ui, path: &str) {
@@ -96,7 +123,18 @@ fn middle_cut(chars: &[char], keep: usize) -> String {
 
 #[cfg(test)]
 mod tests {
-    use super::middle_cut;
+    use super::{middle_cut, time_line};
+    use std::time::Duration;
+
+    #[test]
+    fn the_time_line_has_an_estimate_only_once_there_is_one() {
+        let s = Duration::from_secs;
+        assert_eq!(
+            time_line(s(754), Some(s(1_500))),
+            "12 min 34 s elapsed, about 25 min left"
+        );
+        assert_eq!(time_line(s(3), None), "3 s elapsed");
+    }
 
     #[test]
     fn the_middle_goes_and_both_ends_stay() {

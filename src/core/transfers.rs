@@ -5,12 +5,14 @@
 //! drops while the preview is open, running fails and asks for a new preview.
 
 use super::pairing::files_word;
+use super::progress;
 use super::state::TransferState;
 use super::{Core, lock};
 use crate::model::Direction;
 use crate::net::Connection;
-use crate::transfer::{self, Preview, Progress, Summary, TransferRequest};
+use crate::transfer::{self, Preview, Summary, TransferRequest};
 use anyhow::bail;
+use std::time::Instant;
 use tokio_util::sync::CancellationToken;
 
 /// The preview and the connection that built it live together, so a
@@ -108,6 +110,7 @@ impl Core {
     }
 
     pub(super) fn execute(&self) -> anyhow::Result<()> {
+        let started = Instant::now();
         let cancel = CancellationToken::new();
         let (mut conn, preview, generation) = {
             let mut slot = lock(&self.transfer);
@@ -122,25 +125,14 @@ impl Core {
                     total,
                     files,
                     current: String::new(),
+                    started,
+                    left: None,
                 }
             });
             (conn, preview, slot.generation)
         };
-        let (tx, mut rx) = tokio::sync::mpsc::unbounded_channel();
-        let ui = self.ui.clone();
-        tokio::spawn(async move {
-            while let Some(p) = rx.recv().await {
-                // Only while running: the final state is set by the caller.
-                ui.update(|s| {
-                    if let TransferState::Running { done, current, .. } = &mut s.transfer
-                        && let Progress::File { rel, bytes_done } = p
-                    {
-                        *done = bytes_done;
-                        *current = rel;
-                    }
-                });
-            }
-        });
+        let (tx, rx) = tokio::sync::mpsc::unbounded_channel();
+        progress::follow(self.ui.clone(), rx, started);
         let core = self.clone();
         tokio::spawn(async move {
             let req = preview.request.clone();
