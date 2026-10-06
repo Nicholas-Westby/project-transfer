@@ -66,6 +66,7 @@ fn preview(plans: Vec<Plan>) -> Preview {
                 replaced: vec![],
             })
             .collect(),
+        left_out: Vec::new(),
         warnings: vec![],
         link: None,
         description: false,

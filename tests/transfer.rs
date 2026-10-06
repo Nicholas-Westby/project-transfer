@@ -134,11 +134,8 @@ async fn pull_leaves_out_a_folder_missing_on_the_source() {
 
     let (preview, _) = pull(&a, &b, p.id).await;
     assert!(preview.folders.is_empty());
-    assert!(
-        preview.warnings[0].contains("beds"),
-        "{:?}",
-        preview.warnings
-    );
+    assert_eq!(preview.left_out[0].name, "beds");
+    assert!(preview.warnings.is_empty(), "{:?}", preview.warnings);
     assert_eq!(read(&mine, "precious.txt"), "do not delete");
 }
 

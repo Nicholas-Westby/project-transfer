@@ -11,7 +11,7 @@ use project_transfer::model::{
     ThemeChoice, TransferRecord,
 };
 use project_transfer::protocol::{RemoteFolder, RemoteProject};
-use project_transfer::transfer::{FolderPreview, Preview, TransferRequest};
+use project_transfer::transfer::{FolderPreview, LeftOut, Preview, TransferRequest};
 use std::path::PathBuf;
 use uuid::Uuid;
 
@@ -282,11 +282,13 @@ pub fn sample_preview(s: &UiState) -> Preview {
             send_everything: false,
         },
         folders: vec![app, data],
-        warnings: vec![
-            "Folder `docs` was left out: it is not on this computer, and pushing it would empty \
-             the copy on Desktop Swift Heron."
+        left_out: vec![LeftOut {
+            name: "docs".into(),
+            reason: "It is not on this computer, and pushing it would empty the copy on Desktop \
+                     Swift Heron."
                 .into(),
-        ],
+        }],
+        warnings: vec![],
         link: None,
         description: false,
     }

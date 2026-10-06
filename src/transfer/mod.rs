@@ -15,7 +15,8 @@ pub use op::Op;
 pub use paths::{safe_join, validate_name, validate_rel};
 pub use prepare::prepare;
 pub use preview::{
-    Counts, FolderPreview, Preview, Replaced, TransferRequest, drop_unholdable, replaced_folders,
+    Counts, FolderPreview, LeftOut, Preview, Replaced, TransferRequest, drop_unholdable,
+    replaced_folders,
 };
 
 #[derive(Clone, Debug, PartialEq)]

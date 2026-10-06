@@ -261,6 +261,7 @@ mod tests {
                 send_everything: false,
             },
             folders: Vec::new(),
+            left_out: Vec::new(),
             warnings: Vec::new(),
             link: None,
             description: false,
