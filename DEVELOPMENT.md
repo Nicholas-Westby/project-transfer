@@ -29,7 +29,13 @@ image.
 
 `words.txt` lists every word in the files git tracks, one per line, and
 `word-changes.txt` lists the words a commit added (`+word`) or removed
-(`-word`). The pre-commit hook rewrites both, reading what is staged, so a
-commit's diff shows its new and dropped terms in one short file. Run
+(`-word`). A word that mixes cases, such as `ActivityKind` or `macOS` (not
+`TLS`), is a phrase: `phrases.txt` lists it as written, `words.txt` lists
+its parts (`activity` and `kind`), and `phrase-changes.txt` shows the
+phrases a commit added or removed. A key or other random-looking phrase
+adds no parts. A word that is also a phrase in lower case, such as
+`coolthings` next to `CoolThings`, is listed only as the phrase. The
+pre-commit hook refreshes the lists, reading what is staged, so a commit's
+diff shows its new and dropped terms in two short files. Run
 `cargo xtask words` to refresh them by hand. Binary files, `Cargo.lock` and
-the two lists themselves are left out.
+the lists themselves are left out.

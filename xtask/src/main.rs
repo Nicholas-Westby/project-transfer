@@ -3,6 +3,7 @@
 
 mod icon;
 mod mac;
+mod phrases;
 mod screenshot;
 mod version;
 mod windows;
@@ -13,7 +14,7 @@ use anyhow::{Context, Result, bail};
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
-const USAGE: &str = "usage: cargo xtask <command>\n\n  install [--dest <folder>]   build the app and install it\n  icon                        render assets/icon.png (and icon.ico)\n  screenshot                  render the README screenshot from mock data\n  bump-version                count the version up and stage it\n  words                       rewrite words.txt and word-changes.txt and stage them\n  pre-commit                  bump-version, then words (the pre-commit hook runs this)\n  hooks                       turn on the pre-commit hook for this clone";
+const USAGE: &str = "usage: cargo xtask <command>\n\n  install [--dest <folder>]   build the app and install it\n  icon                        render assets/icon.png (and icon.ico)\n  screenshot                  render the README screenshot from mock data\n  bump-version                count the version up and stage it\n  words                       rewrite the word and phrase lists and stage them\n  pre-commit                  bump-version, then words (the pre-commit hook runs this)\n  hooks                       turn on the pre-commit hook for this clone";
 
 #[derive(Debug, PartialEq)]
 enum Task {
@@ -63,7 +64,7 @@ fn main() -> Result<()> {
         Task::Hooks => {
             version::install_hooks(&repo_root())?;
             println!(
-                "Every commit in this clone now counts the version up and refreshes words.txt."
+                "Every commit in this clone now counts the version up and refreshes the word and phrase lists."
             );
             Ok(())
         }
@@ -89,8 +90,11 @@ fn bump_version() -> Result<()> {
 }
 
 fn refresh_words() -> Result<()> {
-    let (added, removed) = word_list::refresh(&repo_root())?;
+    let counts = word_list::refresh(&repo_root())?;
+    let (added, removed) = counts.words;
     println!("Words: {added} added, {removed} removed");
+    let (added, removed) = counts.phrases;
+    println!("Phrases: {added} added, {removed} removed");
     Ok(())
 }
 

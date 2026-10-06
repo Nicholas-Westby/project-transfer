@@ -8,8 +8,8 @@ How to do local development: `DEVELOPMENT.md`.
 
 - Never shell out for file transfer, discovery or networking. `std::fs`, tokio and the listed crates only. The only processes the app starts are a project's commands and the installer's platform tools (`codesign`, `iconutil`, `ditto`, `lsregister`, PowerShell for the Windows shortcut).
 - No shell scripts in the repo, apart from the `install` and `install.ps1` wrappers and `.githooks/pre-commit`, which only run `cargo xtask`. Other tooling is Rust (`xtask`, run with `cargo xtask`).
-- Every commit counts the patch version up and refreshes `words.txt`: `.githooks/pre-commit` runs `cargo xtask pre-commit`. Turn it on once per clone with `cargo xtask hooks`. The app shows the version next to the settings cog.
-- `words.txt` lists every word in the tracked text files, and `word-changes.txt` the words the latest word-changing commit added (`+`) or removed (`-`). Both are generated; never edit them by hand. Rules are in `xtask/src/words.rs`.
+- Every commit counts the patch version up and refreshes `words.txt` and `phrases.txt`: `.githooks/pre-commit` runs `cargo xtask pre-commit`. Turn it on once per clone with `cargo xtask hooks`. The app shows the version next to the settings cog.
+- `words.txt` lists every word in the tracked text files, and `word-changes.txt` the words the latest word-changing commit added (`+`) or removed (`-`). `phrases.txt` and `phrase-changes.txt` do the same for words that mix cases, such as `ActivityKind` or `macOS` (not `TLS`); `words.txt` lists their parts, except for keys and other random-looking ones. All four are generated; never edit them by hand. Rules are in `xtask/src/words.rs` and `xtask/src/phrases.rs`.
 - Only private addresses: 10/8, 172.16/12, 192.168/16, 169.254/16, 127/8, ::1, fc00::/7, fe80::/10.
 - mDNS service type: `_projtransfer._tcp.local.`
 - Data home: `Project Transfer` in the per-user local app data folder (`store::default_root`), overridden by env `PROJECT_TRANSFER_HOME`.
