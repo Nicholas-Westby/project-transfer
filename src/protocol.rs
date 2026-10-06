@@ -244,12 +244,15 @@ pub async fn write_msg<W: AsyncWrite + Unpin, T: Serialize>(
     w: &mut W,
     msg: &T,
 ) -> anyhow::Result<()> {
-    let body = serde_json::to_vec(msg)?;
-    if body.len() as u64 > MAX_MSG as u64 {
-        bail!("message of {} bytes is over the 64 MiB limit", body.len());
+    let mut framed = vec![0u8; 4];
+    serde_json::to_writer(&mut framed, msg)?;
+    let len = framed.len() - 4;
+    if len as u64 > MAX_MSG as u64 {
+        bail!("message of {len} bytes is over the 64 MiB limit");
     }
-    w.write_all(&(body.len() as u32).to_be_bytes()).await?;
-    w.write_all(&body).await?;
+    framed[..4].copy_from_slice(&(len as u32).to_be_bytes());
+    // One write: over TLS a write is a record, and without Nagle a packet.
+    w.write_all(&framed).await?;
     w.flush().await?;
     Ok(())
 }
