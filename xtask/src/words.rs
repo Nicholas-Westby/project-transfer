@@ -20,16 +20,30 @@ const CONTRACTIONS: [&str; 7] = ["t", "s", "re", "ve", "ll", "d", "m"];
 pub fn words_in(text: &str, escapes: bool) -> BTreeSet<String> {
     let mut found = BTreeSet::new();
     let mut run = String::new();
-    let mut chars = text.chars().peekable();
-    while let Some(c) = chars.next() {
-        if escapes && c == '\\' {
+    let chars: Vec<char> = text.chars().collect();
+    // Inside a Rust raw string, `r#"..."#`, with its number of `#`s.
+    // Backslashes there are plain, as in `r"C:\Users"`.
+    let mut raw: Option<usize> = None;
+    let mut i = 0;
+    while i < chars.len() {
+        let c = chars[i];
+        i += 1;
+        if escapes && c == '"' {
+            raw = match raw {
+                Some(n) if chars[i..].iter().take(n).filter(|&&h| h == '#').count() == n => None,
+                Some(n) => Some(n),
+                None => raw_opening(&chars[..i - 1]),
+            };
+        }
+        if escapes && raw.is_none() && c == '\\' {
             take(&mut run, &mut found);
             // `\\` is a backslash; `\n`, `\t`, `\u{..}` and so on are one
             // character whose letter belongs to no word.
-            if let Some(&next) = chars.peek()
-                && (next == '\\' || "nrtux0".contains(next))
+            if chars
+                .get(i)
+                .is_some_and(|&next| next == '\\' || "nrtux0".contains(next))
             {
-                chars.next();
+                i += 1;
             }
         } else if is_word_char(c) || ((c == '-' || is_apostrophe(c)) && !run.is_empty()) {
             run.push(c);
@@ -39,6 +53,17 @@ pub fn words_in(text: &str, escapes: bool) -> BTreeSet<String> {
     }
     take(&mut run, &mut found);
     found
+}
+
+/// The number of `#`s when the text before a `"` opens a raw string: an `r`
+/// (or `br`) that starts a word, then any `#`s.
+fn raw_opening(before: &[char]) -> Option<usize> {
+    let hashes = before.iter().rev().take_while(|&&c| c == '#').count();
+    let rest = &before[..before.len() - hashes];
+    let (&r, rest) = rest.split_last()?;
+    let rest = rest.strip_suffix(&['b']).unwrap_or(rest);
+    let starts_word = rest.last().is_none_or(|&c| !is_word_char(c) && c != '_');
+    (r == 'r' && starts_word).then_some(hashes)
 }
 
 fn is_apostrophe(c: char) -> bool {
@@ -245,6 +270,18 @@ mod tests {
         assert_eq!(
             list("Jane's one-time GardenPlanner-web"),
             ["garden", "jane's", "one-time", "planner", "web"]
+        );
+    }
+
+    #[test]
+    fn reads_raw_strings_without_escapes() {
+        assert_eq!(
+            list(r#"r"C:\Users\nick" "\nedition""#),
+            ["c", "edition", "nick", "r", "users"]
+        );
+        assert_eq!(
+            list(r###"r#"a\tb"# br"\usr" for"\nx""###),
+            ["a", "br", "for", "r", "tb", "usr", "x"]
         );
     }
 

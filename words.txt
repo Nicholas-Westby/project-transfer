@@ -334,6 +334,7 @@ backdrop
 backend
 background
 backslash
+backslashes
 backticked
 backtraces
 bad
@@ -420,6 +421,7 @@ bounds
 box
 boxes
 boxing
+br
 bracket
 brains
 brave
@@ -1406,7 +1408,6 @@ i32
 i64
 i8
 ibis
-ick
 icns
 ico
 icon
@@ -1859,6 +1860,7 @@ naïve
 nb
 ne
 near
+nedition
 need
 needed
 needle
@@ -1932,6 +1934,7 @@ number
 numbered
 numbers
 nuxt
+nx
 o
 obj
 object
@@ -2077,8 +2080,6 @@ paused
 payload
 pc
 pear
-peek
-peekable
 peer
 peer's
 peers
@@ -2634,7 +2635,6 @@ seq
 serde
 serialize
 serious
-sersecrets
 serve
 server
 serves
@@ -3169,6 +3169,7 @@ usersecrets
 uses
 using
 usize
+usr
 usual
 usually
 utf-8
