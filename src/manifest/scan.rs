@@ -26,13 +26,14 @@ fn walk(
 ) -> anyhow::Result<()> {
     for item in std::fs::read_dir(dir)? {
         let item = item?;
+        let meta = std::fs::symlink_metadata(item.path())?;
         let name = item.file_name().to_string_lossy().into_owned();
+        let name = super::spelling::composed(dir, name, &meta);
         let child = if rel.is_empty() {
             name
         } else {
             format!("{rel}/{name}")
         };
-        let meta = std::fs::symlink_metadata(item.path())?;
         let ft = meta.file_type();
         if ft.is_dir() {
             if matcher.is_ignored(&child, true) {
@@ -223,6 +224,18 @@ mod tests {
         assert!(!m.entries.iter().any(|e| e.rel == "link/f.txt"));
         let sh = m.entries.iter().find(|e| e.rel == "run.sh").unwrap();
         assert!(matches!(sh.kind, Kind::File { exec: true, .. }));
+    }
+
+    /// The walk enters a folder by the name the disk holds, while the entries
+    /// under it are listed by the composed spelling of it.
+    #[cfg(target_os = "macos")]
+    #[test]
+    fn decomposed_folders_and_files_are_listed_by_their_composed_names() {
+        let t = tempfile::tempdir().unwrap();
+        write(t.path(), "Cafe\u{301}/menu\u{301}.md", "soup");
+        let m = scan(t.path(), &matcher()).unwrap();
+        let rels: Vec<_> = m.entries.iter().map(|e| e.rel.as_str()).collect();
+        assert_eq!(rels, ["Caf\u{e9}", "Caf\u{e9}/men\u{fa}.md"]);
     }
 
     #[test]
