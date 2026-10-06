@@ -69,7 +69,10 @@ pub fn need(req: &Request) -> Need {
         | R::SetMtime { .. }
         | R::MakeSymlink { .. }
         | R::Remove { .. }
-        | R::EndPush => Need::Push,
+        | R::EndPush
+        // Both decide where pushed files land.
+        | R::SyncProject { .. }
+        | R::SetFolderPath { .. } => Need::Push,
     }
 }
 

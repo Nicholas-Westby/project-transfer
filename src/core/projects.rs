@@ -3,6 +3,7 @@
 
 use super::Core;
 use crate::model::{Command, CommandId, Description, Folder, FolderId, Os, Project, ProjectId};
+use crate::transfer::home;
 use crate::transfer::projects::{now_ms, update_projects};
 use std::path::{Path, PathBuf};
 
@@ -297,61 +298,8 @@ fn check_folder(all: &[Project], path: &Path, except: Option<FolderId>) -> Edit<
             path.display()
         ));
     }
-    if let Some(why) = too_broad(path) {
+    if let Some(why) = home::too_broad(path, home::real_home().as_deref()) {
         return Err(why);
     }
-    for p in all {
-        for f in p.folders.iter().filter(|f| Some(f.id) != except) {
-            let Some(other) = &f.local_path else { continue };
-            if path.starts_with(other) || other.starts_with(path) {
-                return Err(format!(
-                    "{} overlaps {}, folder `{}` of project `{}`. Choose a folder that is not \
-                     part of another project.",
-                    path.display(),
-                    other.display(),
-                    f.name,
-                    p.name
-                ));
-            }
-        }
-    }
-    Ok(())
-}
-
-/// A project folder is mirrored, deletions included, so the home folder or a
-/// whole disk is refused: one wrong push would rewrite everything on it.
-fn too_broad(path: &Path) -> Option<String> {
-    let real = path.canonicalize().unwrap_or_else(|_| path.to_path_buf());
-    let home = directories::BaseDirs::new().map(|d| d.home_dir().to_path_buf());
-    let home = home.map(|h| h.canonicalize().unwrap_or(h));
-    if home.as_deref() == Some(real.as_path()) {
-        return Some(format!(
-            "{} is your home folder. Choose the project's own folder inside it.",
-            path.display()
-        ));
-    }
-    if real.parent().is_none() || is_mount_point(&real) {
-        return Some(format!(
-            "{} is the top of a disk. Choose the project's own folder on it.",
-            path.display()
-        ));
-    }
-    None
-}
-
-/// A folder on another device than its parent is where a disk is mounted,
-/// such as `/Volumes/USB` on a Mac.
-#[cfg(unix)]
-fn is_mount_point(path: &Path) -> bool {
-    use std::os::unix::fs::MetadataExt;
-    let (Some(parent), Ok(me)) = (path.parent(), std::fs::metadata(path)) else {
-        return false;
-    };
-    std::fs::metadata(parent).is_ok_and(|p| p.dev() != me.dev())
-}
-
-/// Drive roots and shares have no parent, which `too_broad` checks already.
-#[cfg(not(unix))]
-fn is_mount_point(_path: &Path) -> bool {
-    false
+    home::check_overlap(all, path, except)
 }

@@ -59,6 +59,9 @@ impl Instance {
             identity: Arc::new(identity),
             events: tx,
             found: Default::default(),
+            // A home of its own, beside the Projects folder and `src`, so
+            // only folders a test puts under it travel by their place there.
+            home: Some(dir.path().join("user")),
         };
         let received = Arc::new(Mutex::new(Vec::new()));
         let r = received.clone();
@@ -102,6 +105,18 @@ impl Instance {
     /// A source folder outside the Projects folder.
     pub fn project_dir(&self, name: &str) -> PathBuf {
         let p = self.dir.path().join("src").join(name);
+        std::fs::create_dir_all(&p).unwrap();
+        p
+    }
+
+    /// The home folder this instance sees.
+    pub fn home(&self) -> PathBuf {
+        self.dir.path().join("user")
+    }
+
+    /// A folder under the home folder, outside the Projects folder.
+    pub fn home_dir(&self, rel: &str) -> PathBuf {
+        let p = self.home().join(rel);
         std::fs::create_dir_all(&p).unwrap();
         p
     }
@@ -234,6 +249,35 @@ pub async fn push(
 
 pub async fn pull(a: &Instance, b: &Instance, project: ProjectId) -> (Preview, Summary) {
     run(a, b, project, Direction::Pull, false).await
+}
+
+/// Sends A's details of `project` to B, as "Sync details" does.
+pub async fn sync(a: &Instance, b: &Instance, project: ProjectId) -> anyhow::Result<()> {
+    let mut conn = a.open(b).await;
+    transfer::sync_details(&mut conn, &a.shared, project).await?;
+    Ok(())
+}
+
+/// Asks B to keep `folder` of `project` at `path`.
+pub async fn set_peer_path(
+    a: &Instance,
+    b: &Instance,
+    project: ProjectId,
+    folder: uuid::Uuid,
+    path: &str,
+) -> anyhow::Result<()> {
+    let mut conn = a.open(b).await;
+    transfer::set_peer_folder_path(&mut conn, project, folder, path).await
+}
+
+/// The path B keeps for `folder` of `project`.
+pub async fn path_of(b: &Instance, project: ProjectId, folder: uuid::Uuid) -> Option<PathBuf> {
+    b.project(project)
+        .await?
+        .folders
+        .into_iter()
+        .find(|f| f.id == folder)?
+        .local_path
 }
 
 pub fn write(root: &Path, rel: &str, body: &str) {

@@ -4,7 +4,7 @@ use super::preview::{
     FolderPreview, LeftOut, Preview, Replaced, TransferRequest, drop_unholdable, replaced_folders,
 };
 use super::projects::{check_names_for, default_path};
-use super::{link, safe_join};
+use super::{home, link, safe_join};
 use crate::ignore_rules::{IgnoreSpec, Matcher};
 use crate::manifest::{Manifest, compare, compose_for, hash_file, resolve_hashes, scan};
 use crate::model::{Direction, FolderId, Os, Project, ProjectId};
@@ -111,6 +111,7 @@ pub async fn prepare(
             };
             description = p.description.replaces(&theirs);
             let multi = p.folders.len() > 1;
+            let home = shared.home.as_deref();
             for f in &p.folders {
                 let Some(root) = f.local_path.clone().filter(|r| r.is_dir()) else {
                     ctx.leave_out(
@@ -122,7 +123,15 @@ pub async fn prepare(
                     );
                     continue;
                 };
-                let remote = ctx.remote_scan(f.id, &f.name, &p.name, multi).await?;
+                let hint = home.and_then(|h| home::home_hint(&root, &settings.projects_folder, h));
+                let ask = Ask {
+                    folder: f.id,
+                    folder_name: &f.name,
+                    project_name: &p.name,
+                    multi,
+                    hint,
+                };
+                let remote = ctx.remote_scan(ask).await?;
                 let names: Vec<&str> = p.folders.iter().map(|f| f.name.as_str()).collect();
                 check_names_for(&names, remote.os, &peer)?;
                 if !remote.set_up && remote.exists && !remote.manifest.entries.is_empty() {
@@ -160,7 +169,14 @@ pub async fn prepare(
             description = info.description.replaces(&mine.unwrap_or_default());
             let multi = info.folders.len() > 1;
             for rf in &info.folders {
-                let remote = ctx.remote_scan(rf.id, &rf.name, &info.name, multi).await?;
+                let ask = Ask {
+                    folder: rf.id,
+                    folder_name: &rf.name,
+                    project_name: &info.name,
+                    multi,
+                    hint: None,
+                };
+                let remote = ctx.remote_scan(ask).await?;
                 if !remote.set_up || !remote.exists {
                     ctx.leave_out(
                         &rf.name,
@@ -181,6 +197,10 @@ pub async fn prepare(
                         rf.id,
                         &rf.name,
                         multi,
+                        rf.home_hint
+                            .as_deref()
+                            .and_then(|h| home::resolve(shared.home.as_deref(), h))
+                            .as_deref(),
                     ) {
                         Ok(p) => p,
                         Err(reason) => {
@@ -250,6 +270,16 @@ struct Ctx<'a> {
     left_out: Vec<LeftOut>,
 }
 
+/// What the other computer needs to scan a folder, or to say where it
+/// would land there.
+struct Ask<'a> {
+    folder: FolderId,
+    folder_name: &'a str,
+    project_name: &'a str,
+    multi: bool,
+    hint: Option<String>,
+}
+
 /// One folder's two sides: (manifest, display path) each.
 struct Sides {
     folder: FolderId,
@@ -271,21 +301,16 @@ impl Ctx<'_> {
         });
     }
 
-    async fn remote_scan(
-        &mut self,
-        folder: FolderId,
-        folder_name: &str,
-        project_name: &str,
-        multi_folder: bool,
-    ) -> anyhow::Result<FolderScan> {
+    async fn remote_scan(&mut self, ask: Ask<'_>) -> anyhow::Result<FolderScan> {
         let req = Request::Manifest {
             project: self.project,
-            folder,
+            folder: ask.folder,
             ignore: self.spec.clone(),
-            folder_name: folder_name.into(),
-            project_name: project_name.into(),
-            multi_folder,
+            folder_name: ask.folder_name.into(),
+            project_name: ask.project_name.into(),
+            multi_folder: ask.multi,
             from_os: Some(Os::current()),
+            home_hint: ask.hint,
         };
         match self.conn.request(&req).await? {
             Response::Manifest(s) => Ok(s),

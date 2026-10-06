@@ -2,12 +2,14 @@
 
 use super::{Ctx, SessionState, refused};
 use crate::logging::one_line;
-use crate::model::{Direction, Project, ProjectId};
+use crate::model::{Direction, FolderId, Project, ProjectId};
 use crate::net::NetEvent;
 use crate::protocol::{Request, Response};
+use crate::transfer::home::resolve_all;
 use crate::transfer::projects::{StartedBy, adopt, record_transfer, update_projects};
 use crate::transfer::{Applier, Op, validate_name, validate_rel};
 use std::collections::HashMap;
+use std::path::PathBuf;
 use std::time::Instant;
 use tokio::io::{AsyncRead, AsyncReadExt};
 use tracing::{info, warn};
@@ -28,6 +30,13 @@ pub struct PushState {
     started: Instant,
 }
 
+/// Which folder a push begins with and where the preview said it lands.
+struct Landing<'a> {
+    folder: FolderId,
+    expected_path: &'a str,
+    hints: &'a HashMap<FolderId, PathBuf>,
+}
+
 pub struct Incoming<'a> {
     pub rel: &'a str,
     pub size: u64,
@@ -41,7 +50,16 @@ pub async fn handle(ctx: &Ctx<'_>, state: &mut SessionState, req: Request) -> Re
             project,
             folder,
             expected_path,
-        } => begin(ctx, state, project, folder, &expected_path).await,
+            home_hints,
+        } => {
+            let hints = resolve_all(&home_hints, ctx.shared.home.as_deref());
+            let landing = Landing {
+                folder,
+                expected_path: &expected_path,
+                hints: &hints,
+            };
+            begin(ctx, state, project, landing).await
+        }
         Request::EndPush => end(ctx, state).await,
         Request::MakeDir { rel } => apply(ctx, state, &rel, Op::MakeDir),
         Request::MakeSymlink { rel, target } => apply(ctx, state, &rel, Op::Symlink(&target)),
@@ -82,9 +100,13 @@ async fn begin(
     ctx: &Ctx<'_>,
     state: &mut SessionState,
     project: Project,
-    folder: crate::model::FolderId,
-    expected_path: &str,
+    landing: Landing<'_>,
 ) -> Response {
+    let Landing {
+        folder,
+        expected_path,
+        hints,
+    } = landing;
     // Folder names become folder names here; the project's name is a label.
     for f in &project.folders {
         if let Err(reason) = validate_name(&f.name) {
@@ -99,7 +121,7 @@ async fn begin(
         (s.projects_folder.clone(), s.name.clone())
     };
     let adopted = update_projects(ctx.shared, |all| {
-        adopt(all, &project, &pf, &HashMap::new())?;
+        adopt(all, &project, &pf, &HashMap::new(), hints)?;
         let p = all
             .iter()
             .find(|p| p.id == project.id)

@@ -60,6 +60,7 @@ async fn paired_without_push_is_refused_for_begin_push() {
         folder: p.primary,
         project: p,
         expected_path: "/tmp/app".into(),
+        home_hints: Default::default(),
     };
     let reason = refusal(conn.request(&begin).await.unwrap());
     assert!(reason.contains("push"), "{reason}");

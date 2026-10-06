@@ -51,7 +51,7 @@ impl App {
             .map(|f| {
                 let path = remote
                     .and_then(|r| r.folders.iter().find(|rf| rf.id == f.id))
-                    .and_then(|rf| rf.path.clone());
+                    .and_then(|rf| rf.shown.clone().or_else(|| rf.path.clone()));
                 match (path, peer.is_some(), online || remote.is_some()) {
                     (Some(path), _, _) => (widgets::mono(path).color(pal.ink), None),
                     (None, false, _) => (muted("No computer selected"), None),
@@ -154,7 +154,7 @@ impl App {
                             r.on_hover_text(why);
                         }
                     });
-                    self.folder_actions(ui, p, f);
+                    self.folder_actions(ui, s, p, f);
                     ui.end_row();
                 }
             });
@@ -168,14 +168,15 @@ impl App {
 
     /// The one common fix stays visible; the rest sit in a small menu so
     /// the table keeps room for paths.
-    fn folder_actions(&mut self, ui: &mut Ui, p: &Project, f: &Folder) {
+    fn folder_actions(&mut self, ui: &mut Ui, s: &UiState, p: &Project, f: &Folder) {
         let pal = Palette::of(ui.ctx());
         ui.horizontal(|ui| {
             let more = widgets::more_button(ui, &format!("More for {}", f.name));
             Popup::menu(&more).show(|ui| {
-                if f.local_path.is_some() && ui.button("Change folder…").clicked() {
+                if f.local_path.is_some() && ui.button("Change folder here…").clicked() {
                     self.pick_path(p, f);
                 }
+                self.peer_folder_entry(ui, s, p, f);
                 if f.id != p.primary && ui.button("Make primary").clicked() {
                     self.act(Action::SetPrimary(p.id, f.id));
                 }

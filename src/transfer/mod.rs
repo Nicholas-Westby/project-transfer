@@ -1,7 +1,9 @@
 //! Running a push or pull end to end: preview first, then apply.
 
 pub mod apply;
+mod details;
 mod execute;
+pub mod home;
 pub mod link;
 mod op;
 mod paths;
@@ -10,6 +12,7 @@ mod preview;
 pub mod projects;
 
 pub use apply::{Applier, PendingFile};
+pub use details::{Synced, set_peer_folder_path, sync_details};
 pub use execute::execute;
 pub use op::Op;
 pub use paths::{safe_join, validate_name, validate_rel};

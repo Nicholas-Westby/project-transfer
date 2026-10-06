@@ -8,8 +8,27 @@ use crate::model::{Direction, Project};
 use crate::transfer::TransferRequest;
 use egui::{RichText, Ui};
 
+const SYNC_HELP: &str =
+    "Sends this project's folders, description and commands. No files are copied.";
+
 /// Why a push or pull can't start right now, or None when it can.
 pub fn blocked(s: &UiState, p: &Project, dir: Direction) -> Option<String> {
+    peer_blocked(s, dir, "").or_else(|| {
+        let none_here = p.folders.iter().all(|f| f.local_path.is_none());
+        (dir == Direction::Push && none_here)
+            .then(|| "None of this project's folders are on this computer yet.".into())
+    })
+}
+
+/// Why "Sync details" can't run right now. It needs what a push needs from
+/// the peer, but a project with no folder here still has details to send.
+pub fn sync_blocked(s: &UiState) -> Option<String> {
+    peer_blocked(s, Direction::Push, ", which syncing details needs")
+}
+
+/// What the selected peer, its permissions or an open transfer stand in
+/// the way of; `needs` goes after a missing permission.
+fn peer_blocked(s: &UiState, dir: Direction, needs: &str) -> Option<String> {
     let Some(peer) = s.selected_peer.and_then(|id| s.peer(id)) else {
         return Some(if s.peers.is_empty() {
             "Pair a computer first. Open the menu in the bar above.".into()
@@ -28,14 +47,11 @@ pub fn blocked(s: &UiState, p: &Project, dir: Direction) -> Option<String> {
     }
     match dir {
         Direction::Push if !peer.peer.granted.may_push_to_me => Some(format!(
-            "{name} doesn't allow pushes from this computer. Allow it on {name}."
+            "{name} doesn't allow pushes from this computer{needs}. Allow it on {name}."
         )),
         Direction::Pull if !peer.peer.granted.may_pull_from_me => Some(format!(
-            "{name} doesn't allow pulls to this computer. Allow it on {name}."
+            "{name} doesn't allow pulls to this computer{needs}. Allow it on {name}."
         )),
-        Direction::Push if p.folders.iter().all(|f| f.local_path.is_none()) => {
-            Some("None of this project's folders are on this computer yet.".into())
-        }
         _ => None,
     }
 }
@@ -116,6 +132,30 @@ impl App {
                 ui,
                 "Includes ignored folders such as node_modules, next transfer only.",
             );
+        });
+        ui.add_space(8.0);
+        self.sync_row(ui, s, p, &peer);
+    }
+
+    /// A plain button below the filled ones: sending details is a smaller
+    /// step than a transfer.
+    fn sync_row(&mut self, ui: &mut Ui, s: &UiState, p: &Project, peer: &str) {
+        let pal = Palette::of(ui.ctx());
+        let reason = sync_blocked(s);
+        ui.horizontal(|ui| {
+            let label = format!("Sync details with {peer}");
+            let r = ui
+                .add_enabled(reason.is_none(), egui::Button::new(label))
+                .on_hover_text(SYNC_HELP);
+            if r.clicked() {
+                self.act(Action::SyncDetails(p.id));
+            }
+            // A reason Pull and Push already give reads once, above.
+            let note = reason
+                .as_deref()
+                .filter(|r| blocked(s, p, Direction::Push).as_deref() != Some(*r))
+                .unwrap_or(SYNC_HELP);
+            ui.add(egui::Label::new(RichText::new(note).small().color(pal.muted())).wrap());
         });
     }
 }

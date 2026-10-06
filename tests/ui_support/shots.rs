@@ -201,6 +201,20 @@ pub fn all(dir: &Path) {
     shot(dir, "22-description-editing", FakeBackend::seeded(), |h| {
         h.get_by_label("Description").focus();
     });
+    shot(dir, "23-folder-menu", FakeBackend::seeded(), |h| {
+        h.get_by_label("More for app").click_accesskit();
+    });
+    shot(
+        dir,
+        "23b-change-folder-on-peer",
+        FakeBackend::seeded(),
+        |h| {
+            h.get_by_label("More for app").click_accesskit();
+            h.run_ok();
+            h.get_by_label("Change folder on Desktop Swift Heron…")
+                .click_accesskit();
+        },
+    );
     // A word longer than the box still wraps inside it.
     let f = FakeBackend::seeded();
     f.update(|s| {

@@ -1,5 +1,6 @@
 //! Applying a confirmed preview: folders first, then files, times, removals.
 
+use super::home::{hints_for, resolve};
 use super::prepare::{check_peer, local_project, unexpected};
 use super::preview::{FolderPreview, Preview};
 use super::projects::{
@@ -109,6 +110,8 @@ impl Run<'_> {
                 .context("This project is no longer on this computer.")?,
             Direction::Pull => self.take_in_project(shared, preview).await?,
         };
+        let pf = shared.settings.read().await.projects_folder.clone();
+        let hints = hints_for(&project, &pf, shared.home.as_deref());
         for fp in &preview.folders {
             let side = match req.direction {
                 Direction::Push => {
@@ -116,6 +119,7 @@ impl Run<'_> {
                         project: wire_project(&project),
                         folder: fp.folder,
                         expected_path: fp.dest_path.clone(),
+                        home_hints: hints.clone(),
                     };
                     self.expect_ok(&begin, "the start of the push").await?;
                     Side::Push(PathBuf::from(&fp.source_path))
@@ -189,6 +193,16 @@ impl Run<'_> {
             Response::ProjectInfo(Some(i)) => i,
             other => return Err(unexpected(self.conn, "the project request", other)),
         };
+        let hints: HashMap<_, _> = info
+            .folders
+            .iter()
+            .filter_map(|f| {
+                Some((
+                    f.id,
+                    resolve(shared.home.as_deref(), f.home_hint.as_deref()?)?,
+                ))
+            })
+            .collect();
         let incoming = Project {
             id,
             name: info.name,
@@ -212,7 +226,7 @@ impl Run<'_> {
             .map(|f| (f.folder, PathBuf::from(&f.dest_path)))
             .collect();
         let pf = shared.settings.read().await.projects_folder.clone();
-        update_projects(shared, |all| adopt(all, &incoming, &pf, &chosen)).await?;
+        update_projects(shared, |all| adopt(all, &incoming, &pf, &chosen, &hints)).await?;
         local_project(shared, id)
             .await
             .context("The project could not be recorded.")

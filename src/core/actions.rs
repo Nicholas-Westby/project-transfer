@@ -57,6 +57,11 @@ pub enum Action {
     RemoveFolder(ProjectId, FolderId),
     SetFolderPath(ProjectId, FolderId, PathBuf),
     SetPrimary(ProjectId, FolderId),
+    /// Sends the project's folders, description and commands to the
+    /// selected peer and takes in what it has; copies no files.
+    SyncDetails(ProjectId),
+    /// Where the selected peer keeps a folder, as typed; `~` is its home.
+    SetPeerFolderPath(ProjectId, FolderId, String),
 
     Prepare(TransferRequest),
     /// Runs the preview in `TransferState::Ready`.
@@ -132,6 +137,8 @@ impl Core {
             Action::RemoveFolder(id, f) => self.remove_folder(id, f).await,
             Action::SetFolderPath(id, f, path) => self.set_folder_path(id, f, path).await,
             Action::SetPrimary(id, f) => self.set_primary(id, f).await,
+            Action::SyncDetails(id) => self.sync_details(id),
+            Action::SetPeerFolderPath(id, f, path) => self.set_peer_folder(id, f, path),
 
             Action::Prepare(req) => self.prepare(req),
             Action::Execute => self.execute(),

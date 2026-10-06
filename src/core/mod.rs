@@ -4,6 +4,7 @@
 //! never waits for it.
 
 mod actions;
+mod details;
 mod found;
 mod pairing;
 mod peers;
@@ -141,6 +142,7 @@ impl AppCore {
             identity: Arc::new(identity),
             events,
             found: Default::default(),
+            home: crate::transfer::home::real_home(),
         };
         let core = Core {
             shared: shared.clone(),

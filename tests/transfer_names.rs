@@ -107,6 +107,7 @@ async fn a_mac_lists_the_composed_name_only_for_a_computer_that_is_not_a_mac() {
             project_name: "Garden".into(),
             multi_folder: false,
             from_os,
+            home_hint: None,
         };
         let Response::Manifest(scan) = conn.request(&ask).await.unwrap() else {
             panic!("no folder scan when asked as {from_os:?}");
@@ -133,6 +134,7 @@ async fn a_push_that_writes_one_spelling_and_removes_another_keeps_the_file() {
         project: a.project(p.id).await.unwrap(),
         folder: p.primary,
         expected_path: dest.display().to_string(),
+        home_hints: Default::default(),
     };
     assert_eq!(conn.request(&begin).await.unwrap(), Response::Ok);
     let put = Request::PutFile {
