@@ -1,7 +1,8 @@
-//! Splits text into the words listed in `words.txt`. A word starts with a
-//! letter and is made of letters and digits (`player1`, `blake3`), joined by
+//! Splits text into the words listed in `words.txt`. A word is letters and
+//! digits with at least one letter (`player1`, `blake3`, `4b96`), joined by
 //! single hyphens (`one-time`). Everything is lowercased so `Result` and
-//! `result` are one entry.
+//! `result` are one entry. Hashes, keys and other random-looking strings are
+//! kept on purpose: spotting a committed secret is one reason for the list.
 
 use std::collections::BTreeSet;
 
@@ -96,15 +97,12 @@ fn split_apostrophes(part: &str) -> Vec<String> {
     out
 }
 
-/// The words to list from one piece; none for numbers and hashes.
+/// The words to list from one piece; none for plain numbers.
 fn clean(piece: &str) -> Vec<String> {
     let piece = piece.replace('\u{2019}', "'");
-    if looks_like_hash(&piece) {
-        return Vec::new();
-    }
     split_camel_case(&piece)
         .into_iter()
-        .filter(|w| w.chars().next().is_some_and(char::is_alphabetic))
+        .filter(|w| w.chars().any(char::is_alphabetic))
         .map(|w| w.to_lowercase())
         .collect()
 }
@@ -134,22 +132,30 @@ fn split_camel_case(piece: &str) -> Vec<String> {
         }
     }
     words.retain(|w| !w.is_empty());
+    if looks_random(&words) {
+        return vec![piece.to_string()];
+    }
     words
 }
 
-/// Commit ids, UUIDs and colors such as `fbfd86e` or `e5e7eb` would fill the
-/// list with noise. Hex that switches between letters and digits more than
-/// once is taken as a hash; `ed25519` and `b3` switch once and stay.
-fn looks_like_hash(word: &str) -> bool {
-    let hex: Vec<char> = word.chars().filter(|&c| c != '-').collect();
-    if !hex.iter().all(char::is_ascii_hexdigit) {
-        return false;
-    }
-    let switches = hex
-        .windows(2)
-        .filter(|w| w[0].is_ascii_digit() != w[1].is_ascii_digit())
+/// A key such as `aB3xQ9zK` splits into scraps (`B3x`, `K`) that would hide
+/// it among real words, so it stays whole. Real identifiers split into parts
+/// of letters with at most trailing digits, and most have three letters or more.
+fn looks_random(parts: &[String]) -> bool {
+    let odd_digits = parts.iter().any(|p| {
+        let letters_end = p.trim_end_matches(|c: char| c.is_ascii_digit());
+        letters_end.chars().any(|c| c.is_ascii_digit())
+    });
+    let short = parts
+        .iter()
+        .filter(|p| {
+            p.trim_end_matches(|c: char| c.is_ascii_digit())
+                .chars()
+                .count()
+                <= 2
+        })
         .count();
-    switches >= 2
+    odd_digits || short * 2 > parts.len()
 }
 
 #[cfg(test)]
@@ -183,14 +189,22 @@ mod tests {
     }
 
     #[test]
-    fn drops_numbers_and_hashes() {
-        assert_eq!(list("2024 0.1.62 4b96 #1f2937"), Vec::<String>::new());
-        assert_eq!(list("fbfd86e e5e7eb a1b2c3d4-e5f6"), Vec::<String>::new());
+    fn drops_plain_numbers_only() {
+        assert_eq!(list("2024 0.1.62 2026-10-06"), Vec::<String>::new());
+        assert_eq!(list("4b96 #1f2937 fbfd86e"), ["1f2937", "4b96", "fbfd86e"]);
         assert_eq!(
             list("127ca604-f3cd-4b96-b52e-71c8d06fabe3"),
-            Vec::<String>::new()
+            ["127ca604-f3cd-4b96-b52e-71c8d06fabe3"]
         );
-        assert_eq!(list("ed25519 b3 face"), ["b3", "ed25519", "face"]);
+    }
+
+    #[test]
+    fn keeps_random_looking_keys_whole() {
+        assert_eq!(
+            list("aB3xQ9zK sk-proj-Xy7Qa9Lm"),
+            ["ab3xq9zk", "sk-proj-xy7qa9lm"]
+        );
+        assert_eq!(list("aBxQzK iOS"), ["abxqzk", "ios"]);
     }
 
     #[test]
