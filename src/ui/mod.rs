@@ -10,6 +10,7 @@ pub mod description;
 pub mod dialogs;
 mod folders;
 mod pairing;
+mod path_cut;
 mod peer_folder;
 mod picker;
 mod preview;
