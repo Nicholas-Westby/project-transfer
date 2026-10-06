@@ -22,6 +22,10 @@ On Windows PowerShell, set the variable first with
 port by itself, and the two find each other within a few seconds.
 
 `cargo xtask icon` redraws `assets/icon.png` and `assets/icon.ico`.
+`cargo xtask screenshot` redraws the README screenshot,
+`assets/images/project-transfer.webp`, from the UI tests' made-up computers
+and projects. Run it whenever the main window looks different, and commit the
+image.
 
 `words.txt` lists every word in the files git tracks, one per line, and
 `word-changes.txt` lists the words a commit added (`+word`) or removed

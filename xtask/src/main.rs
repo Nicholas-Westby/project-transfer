@@ -1,8 +1,9 @@
-//! Project tooling: `cargo xtask install`, `icon`, `bump-version`, `words`,
-//! `pre-commit` and `hooks`.
+//! Project tooling: `cargo xtask install`, `icon`, `screenshot`,
+//! `bump-version`, `words`, `pre-commit` and `hooks`.
 
 mod icon;
 mod mac;
+mod screenshot;
 mod version;
 mod windows;
 mod word_list;
@@ -12,12 +13,13 @@ use anyhow::{Context, Result, bail};
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
-const USAGE: &str = "usage: cargo xtask <command>\n\n  install [--dest <folder>]   build the app and install it\n  icon                        render assets/icon.png (and icon.ico)\n  bump-version                count the version up and stage it\n  words                       rewrite words.txt and word-changes.txt and stage them\n  pre-commit                  bump-version, then words (the pre-commit hook runs this)\n  hooks                       turn on the pre-commit hook for this clone";
+const USAGE: &str = "usage: cargo xtask <command>\n\n  install [--dest <folder>]   build the app and install it\n  icon                        render assets/icon.png (and icon.ico)\n  screenshot                  render the README screenshot from mock data\n  bump-version                count the version up and stage it\n  words                       rewrite words.txt and word-changes.txt and stage them\n  pre-commit                  bump-version, then words (the pre-commit hook runs this)\n  hooks                       turn on the pre-commit hook for this clone";
 
 #[derive(Debug, PartialEq)]
 enum Task {
     Install { dest: Option<PathBuf> },
     Icon,
+    Screenshot,
     BumpVersion,
     Words,
     PreCommit,
@@ -27,6 +29,7 @@ enum Task {
 fn parse_args(args: &[String]) -> Result<Task> {
     match args.first().map(String::as_str) {
         Some("icon") if args.len() == 1 => Ok(Task::Icon),
+        Some("screenshot") if args.len() == 1 => Ok(Task::Screenshot),
         Some("bump-version") if args.len() == 1 => Ok(Task::BumpVersion),
         Some("words") if args.len() == 1 => Ok(Task::Words),
         Some("pre-commit") if args.len() == 1 => Ok(Task::PreCommit),
@@ -53,6 +56,7 @@ fn main() -> Result<()> {
     let args: Vec<String> = std::env::args().skip(1).collect();
     match parse_args(&args)? {
         Task::Icon => icon::render_files(&repo_root()),
+        Task::Screenshot => screenshot::render(&repo_root()),
         Task::BumpVersion => bump_version(),
         Task::Words => refresh_words(),
         Task::PreCommit => bump_version().and_then(|()| refresh_words()),
@@ -177,6 +181,10 @@ mod tests {
     fn parses_commands() {
         assert_eq!(parse_args(&args(&["icon"])).unwrap(), Task::Icon);
         assert_eq!(
+            parse_args(&args(&["screenshot"])).unwrap(),
+            Task::Screenshot
+        );
+        assert_eq!(
             parse_args(&args(&["bump-version"])).unwrap(),
             Task::BumpVersion
         );
@@ -201,5 +209,6 @@ mod tests {
         assert!(parse_args(&args(&["install", "--dest"])).is_err());
         assert!(parse_args(&args(&["install", "--bogus"])).is_err());
         assert!(parse_args(&args(&["nope"])).is_err());
+        assert!(parse_args(&args(&["screenshot", "x"])).is_err());
     }
 }
