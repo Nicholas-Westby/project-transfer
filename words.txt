@@ -1885,7 +1885,6 @@ next
 nfc
 nh
 nicholas
-nick
 nil
 nimble
 nlines
@@ -2961,6 +2960,7 @@ test
 test-install
 test-util
 tested
+tester
 tests
 text
 texts
