@@ -240,7 +240,7 @@ mod tests {
             list(r#""a\nedition\tb \\target \u{2192}""#),
             ["a", "b", "edition", "target"]
         );
-        assert_eq!(read(r"C:\Users\nick", false).0, ["c", "nick", "users"]);
+        assert_eq!(read(r"C:\Users\tester", false).0, ["c", "tester", "users"]);
     }
 
     #[test]
@@ -279,8 +279,8 @@ mod tests {
     #[test]
     fn reads_raw_strings_without_escapes() {
         assert_eq!(
-            list(r#"r"C:\Users\nick" "\nedition""#),
-            ["c", "edition", "nick", "r", "users"]
+            list(r#"r"C:\Users\tester" "\nedition""#),
+            ["c", "edition", "r", "tester", "users"]
         );
         assert_eq!(
             list(r###"r#"a\tb"# br"\usr" for"\nx""###),
