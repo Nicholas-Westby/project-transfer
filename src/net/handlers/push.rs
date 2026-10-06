@@ -8,6 +8,7 @@ use crate::protocol::{Request, Response};
 use crate::transfer::projects::{StartedBy, adopt, record_transfer, update_projects};
 use crate::transfer::{Applier, Op, validate_name, validate_rel};
 use std::collections::HashMap;
+use std::time::Instant;
 use tokio::io::{AsyncRead, AsyncReadExt};
 use tracing::{info, warn};
 
@@ -19,8 +20,12 @@ pub struct PushState {
     applier: Applier,
     /// Files written in this push, across its folders.
     files: u64,
+    /// Their content bytes, for the log.
+    bytes: u64,
     /// Entries refused in this push, across its folders.
     failed: u64,
+    /// Since the first folder of this push began.
+    started: Instant,
 }
 
 pub struct Incoming<'a> {
@@ -141,16 +146,18 @@ async fn begin(
             root.display()
         ),
     }
-    let (files, failed) = match &state.push {
-        Some(p) if p.project == project.id => (p.files, p.failed),
-        _ => (0, 0),
+    let (files, bytes, failed, started) = match &state.push {
+        Some(p) if p.project == project.id => (p.files, p.bytes, p.failed, p.started),
+        _ => (0, 0, 0, Instant::now()),
     };
     info!("{} began pushing to {}", ctx.peer.name, root.display());
     state.push = Some(PushState {
         project: project.id,
         applier,
         files,
+        bytes,
         failed,
+        started,
     });
     Response::Ok
 }
@@ -165,6 +172,8 @@ async fn end(ctx: &Ctx<'_>, state: &mut SessionState) -> Response {
     };
     let peer = ctx.peer.id;
     let (project, files, failed) = (push.project, push.files, push.failed);
+    let mb = push.bytes as f64 / 1e6;
+    let secs = push.started.elapsed().as_secs_f64();
     if let Err(e) = record_transfer(
         ctx.shared,
         project,
@@ -178,10 +187,13 @@ async fn end(ctx: &Ctx<'_>, state: &mut SessionState) -> Response {
         warn!("could not record the push: {e:#}");
     }
     if failed == 0 {
-        info!("{} pushed {files} files", ctx.peer.name);
+        info!(
+            "{} pushed {files} files ({mb:.1} MB) in {secs:.1} s",
+            ctx.peer.name
+        );
     } else {
         warn!(
-            "{} pushed {files} files; {failed} could not be applied",
+            "{} pushed {files} files ({mb:.1} MB) in {secs:.1} s; {failed} could not be applied",
             ctx.peer.name
         );
     }
@@ -231,6 +243,7 @@ pub async fn put_file<S: AsyncRead + Unpin>(
             Ok(()) => {
                 if let Some(push) = &mut state.push {
                     push.files += 1;
+                    push.bytes += file.size;
                 }
                 return Ok(Response::Ok);
             }

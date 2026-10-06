@@ -278,3 +278,33 @@ async fn a_pull_names_the_right_files_among_many_the_other_computer_lost() {
         assert_eq!(read(&mine, &numbered(i)), format!("content {i}"));
     }
 }
+
+/// Size, time and speed in the log tell a slow network from a slow disk.
+#[tokio::test]
+async fn both_computers_log_how_much_a_push_moved_and_how_fast() {
+    let (log, _guard) = Log::start();
+    let (a, b) = pair_full().await;
+    let src = a.project_dir("app");
+    write(&src, "one.txt", &"x".repeat(1_500_000));
+    let p = a.add_project("Garden", &[("app", &src)]).await;
+    push(&a, &b, p.id, false).await;
+    let b_name = name(&b).await;
+    let text = log.text();
+    let sender = text
+        .lines()
+        .find(|l| l.contains("pushed 1 files") && l.contains(&b_name))
+        .unwrap_or_else(|| panic!("no line from A: {text}"));
+    assert!(
+        sender.contains("1.5 MB") && sender.contains("MB/s"),
+        "{sender}"
+    );
+    let a_name = name(&a).await;
+    let receiver = text
+        .lines()
+        .find(|l| l.contains(&format!("{a_name} pushed 1 files")))
+        .unwrap_or_else(|| panic!("no line from B: {text}"));
+    assert!(
+        receiver.contains("1.5 MB") && receiver.contains(" s"),
+        "{receiver}"
+    );
+}
