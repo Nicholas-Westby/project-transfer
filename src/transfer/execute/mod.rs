@@ -22,11 +22,13 @@ use tracing::warn;
 
 mod ops;
 mod plan;
+mod report;
 mod stream;
 mod window;
 
 use super::Op;
 use plan::{content, is_dir_change, totals, written_rel};
+use report::log_done;
 use window::{Awaiting, Counts};
 
 const CANCELLED: &str = "The transfer was cancelled. Files already copied stay in place.";
@@ -54,6 +56,7 @@ pub async fn execute(
         Ok(()) => {
             let mut s = run.summary;
             s.took_ms = started.elapsed().as_millis() as u64;
+            log_done(run.direction, run.conn.peer_name(), &s);
             let _ = progress.send(Progress::Done(s.clone()));
             Ok(s)
         }
