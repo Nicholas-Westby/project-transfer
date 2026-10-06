@@ -226,8 +226,8 @@ mod tests {
         assert!(matches!(sh.kind, Kind::File { exec: true, .. }));
     }
 
-    /// The walk enters a folder by the name the disk holds, while the entries
-    /// under it are listed by the composed spelling of it.
+    /// A folder and a file in it, both stored decomposed, are listed by their
+    /// composed names, so the file's path is built on the composed folder name.
     #[cfg(target_os = "macos")]
     #[test]
     fn decomposed_folders_and_files_are_listed_by_their_composed_names() {

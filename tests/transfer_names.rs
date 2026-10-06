@@ -1,8 +1,9 @@
 //! File names beyond plain ASCII arrive exactly as they were sent, byte for
 //! byte, in both directions. A name only ever travels as UTF-8 text, so a
 //! letter can't turn into another one on the way. The one change is made
-//! before a name leaves a Mac: it sends the composed spelling of a letter
-//! like "ú", because Windows tells the two spellings apart.
+//! before a name leaves a Mac: a decomposed accented letter, such as "u" plus
+//! the combining accent U+0301, goes as the one composed letter "ú" (U+00FA),
+//! because Windows tells the two spellings apart. Nothing else is replaced.
 
 mod support;
 
@@ -13,11 +14,15 @@ use support::*;
 
 /// Each in its own folder: macOS treats the two spellings of "ú" as one
 /// name, so side by side they would collide.
-const NAMES: [&str; 6] = [
+const NAMES: [&str; 7] = [
     // "ú" as one code point, as most databases store it.
     "composed/sold\u{fa}-5313338.jpg",
     // "u" followed by a combining accent, as older Mac tools write it.
     "decomposed/soldu\u{301}-5313338.jpg",
+    // Unicode composition would swap this ideograph for U+585A, though a
+    // Mac's disk opens the file by either; it was never decomposed, so it
+    // must keep its name.
+    "compat/\u{fa10}.txt",
     "cjk/\u{65e5}\u{672c}\u{8a9e}.txt",
     "emoji/\u{1f600}.png",
     // The half-width bracket a code-page mix-up leaves in place of "ú".
@@ -122,10 +127,12 @@ async fn a_push_that_writes_one_spelling_and_removes_another_keeps_the_file() {
     assert_eq!(read(&dest, "sold\u{fa}.jpg"), "new");
 }
 
-/// A pull from a computer that lists the file under the other spelling, such
-/// as a Windows PC that kept the decomposed one, plans the same pair, and the
-/// pull keeps its own applier for each folder it writes. A Mac lists both
-/// spellings as one name, so the plan gets its removal by hand.
+/// A Windows PC that kept the decomposed "ú" (a "u" and a combining accent)
+/// lists the file that way, while this Mac lists its own as the composed "ú".
+/// The plan adds the decomposed name and removes the composed one, which on a
+/// Mac is the same file, and the pull keeps its own applier for each folder it
+/// writes. A Mac no longer lists the decomposed spelling itself, so the plan is
+/// edited by hand to match.
 #[cfg(target_os = "macos")]
 #[tokio::test]
 async fn a_pull_that_writes_one_spelling_and_removes_another_keeps_the_file() {
@@ -140,14 +147,20 @@ async fn a_pull_that_writes_one_spelling_and_removes_another_keeps_the_file() {
     let req = a.request(&b, p.id, Direction::Pull).await;
     let mut preview = transfer::prepare(&mut conn, &a.shared, req).await.unwrap();
     let mine = a.dev().join("media");
-    write(&mine, "soldu\u{301}.jpg", "old");
-    let remove = Change::RemoveFile("soldu\u{301}.jpg".into());
-    preview.folders[0].plan.changes.push(remove);
+    write(&mine, "sold\u{fa}.jpg", "old");
+    let plan = &mut preview.folders[0].plan;
+    let added = plan.changes.iter_mut().find_map(|c| match c {
+        Change::Add(e) if e.rel == "sold\u{fa}.jpg" => Some(e),
+        _ => None,
+    });
+    added.expect("the new file is planned as an add").rel = "soldu\u{301}.jpg".into();
+    plan.changes
+        .push(Change::RemoveFile("sold\u{fa}.jpg".into()));
     let (tx, _rx) = tokio::sync::mpsc::unbounded_channel();
     let cancel = Default::default();
     let summary = transfer::execute(&mut conn, &a.shared, preview, tx, cancel)
         .await
         .unwrap();
     assert!(summary.failures.is_empty(), "{:?}", summary.failures);
-    assert_eq!(read(&mine, "sold\u{fa}.jpg"), "new");
+    assert_eq!(read(&mine, "soldu\u{301}.jpg"), "new");
 }
