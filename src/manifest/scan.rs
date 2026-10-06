@@ -4,15 +4,16 @@ use std::io::Read;
 use std::path::Path;
 
 /// Walks `root` without following symlinks. Only `matcher` decides what is
-/// ignored; `.gitignore` files are deliberately not read.
-pub fn scan(root: &Path, matcher: &Matcher) -> anyhow::Result<Manifest> {
+/// ignored; `.gitignore` files are deliberately not read. With `compose`, a
+/// name stored decomposed is listed composed (see `compose_for`).
+pub fn scan(root: &Path, matcher: &Matcher, compose: bool) -> anyhow::Result<Manifest> {
     let mut m = Manifest::default();
     if std::fs::symlink_metadata(root).is_err() {
         return Ok(m);
     }
     // Every existing ancestor directory of a file gets its ignored count.
     let mut chain = vec![String::new()];
-    walk(root, "", matcher, &mut m, &mut chain)?;
+    walk(root, "", matcher, compose, &mut m, &mut chain)?;
     m.entries.sort_by(|a, b| a.rel.cmp(&b.rel));
     Ok(m)
 }
@@ -21,14 +22,17 @@ fn walk(
     dir: &Path,
     rel: &str,
     matcher: &Matcher,
+    compose: bool,
     m: &mut Manifest,
     chain: &mut Vec<String>,
 ) -> anyhow::Result<()> {
     for item in std::fs::read_dir(dir)? {
         let item = item?;
         let meta = std::fs::symlink_metadata(item.path())?;
-        let name = item.file_name().to_string_lossy().into_owned();
-        let name = super::spelling::composed(dir, name, &meta);
+        let mut name = item.file_name().to_string_lossy().into_owned();
+        if compose {
+            name = super::spelling::composed(dir, name, &meta);
+        }
         let child = if rel.is_empty() {
             name
         } else {
@@ -46,7 +50,7 @@ fn walk(
                 kind: Kind::Dir,
             });
             chain.push(child.clone());
-            walk(&item.path(), &child, matcher, m, chain)?;
+            walk(&item.path(), &child, matcher, compose, m, chain)?;
             chain.pop();
         } else if matcher.is_ignored(&child, false) {
             bump(m, chain, 1);
@@ -152,7 +156,7 @@ mod tests {
     #[test]
     fn missing_root_is_empty() {
         let t = tempfile::tempdir().unwrap();
-        let m = scan(&t.path().join("nope"), &matcher()).unwrap();
+        let m = scan(&t.path().join("nope"), &matcher(), false).unwrap();
         assert_eq!(m, Manifest::default());
     }
 
@@ -161,7 +165,7 @@ mod tests {
         let t = tempfile::tempdir().unwrap();
         write(t.path(), "src/main.rs", "fn main(){}");
         std::fs::create_dir(t.path().join("empty")).unwrap();
-        let m = scan(t.path(), &matcher()).unwrap();
+        let m = scan(t.path(), &matcher(), false).unwrap();
         let rels: Vec<_> = m.entries.iter().map(|e| e.rel.as_str()).collect();
         assert_eq!(rels, ["empty", "src", "src/main.rs"]);
         assert_eq!(m.entries[0].kind, Kind::Dir);
@@ -182,7 +186,7 @@ mod tests {
         write(t.path(), "a/node_modules/2.js", "2");
         write(t.path(), "a/.DS_Store", "d");
         write(t.path(), "b/.DS_Store", "d");
-        let m = scan(t.path(), &matcher()).unwrap();
+        let m = scan(t.path(), &matcher(), false).unwrap();
         let rels: Vec<_> = m.entries.iter().map(|e| e.rel.as_str()).collect();
         assert_eq!(rels, ["a", "a/keep.txt", "b"]);
         assert_eq!(m.ignored_in_dir.get("a"), Some(&3));
@@ -196,7 +200,7 @@ mod tests {
         let t = tempfile::tempdir().unwrap();
         write(t.path(), ".gitignore", "secret.txt\n");
         write(t.path(), "secret.txt", "s");
-        let m = scan(t.path(), &matcher()).unwrap();
+        let m = scan(t.path(), &matcher(), false).unwrap();
         assert!(m.entries.iter().any(|e| e.rel == "secret.txt"));
     }
 
@@ -213,7 +217,7 @@ mod tests {
             std::fs::Permissions::from_mode(0o755),
         )
         .unwrap();
-        let m = scan(t.path(), &matcher()).unwrap();
+        let m = scan(t.path(), &matcher(), false).unwrap();
         let link = m.entries.iter().find(|e| e.rel == "link").unwrap();
         assert_eq!(
             link.kind,
@@ -226,16 +230,20 @@ mod tests {
         assert!(matches!(sh.kind, Kind::File { exec: true, .. }));
     }
 
-    /// A folder and a file in it, both stored decomposed, are listed by their
-    /// composed names, so the file's path is built on the composed folder name.
+    /// A folder and a file in it, both stored decomposed, are listed as stored
+    /// unless the scan composes, and then by their composed names, so the
+    /// file's path is built on the composed folder name.
     #[cfg(target_os = "macos")]
     #[test]
-    fn decomposed_folders_and_files_are_listed_by_their_composed_names() {
+    fn decomposed_folders_and_files_are_composed_only_when_asked() {
         let t = tempfile::tempdir().unwrap();
         write(t.path(), "Cafe\u{301}/menu\u{301}.md", "soup");
-        let m = scan(t.path(), &matcher()).unwrap();
-        let rels: Vec<_> = m.entries.iter().map(|e| e.rel.as_str()).collect();
-        assert_eq!(rels, ["Caf\u{e9}", "Caf\u{e9}/men\u{fa}.md"]);
+        let rels = |compose| {
+            let m = scan(t.path(), &matcher(), compose).unwrap();
+            m.entries.into_iter().map(|e| e.rel).collect::<Vec<_>>()
+        };
+        assert_eq!(rels(false), ["Cafe\u{301}", "Cafe\u{301}/menu\u{301}.md"]);
+        assert_eq!(rels(true), ["Caf\u{e9}", "Caf\u{e9}/men\u{fa}.md"]);
     }
 
     #[test]

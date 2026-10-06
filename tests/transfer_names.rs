@@ -1,9 +1,11 @@
 //! File names beyond plain ASCII arrive exactly as they were sent, byte for
 //! byte, in both directions. A name only ever travels as UTF-8 text, so a
-//! letter can't turn into another one on the way. The one change is made
-//! before a name leaves a Mac: a decomposed accented letter, such as "u" plus
-//! the combining accent U+0301, goes as the one composed letter "ú" (U+00FA),
-//! because Windows tells the two spellings apart. Nothing else is replaced.
+//! letter can't turn into another one on the way. Both computers here run
+//! the same system, and between two Macs names travel as stored. Toward a
+//! computer that is not a Mac, a Mac sends a decomposed accented letter, such
+//! as "u" plus the combining accent U+0301, as the one composed letter "ú"
+//! (U+00FA), because Windows tells the two spellings apart. Nothing else is
+//! replaced.
 
 mod support;
 
@@ -47,23 +49,12 @@ fn names(root: &Path) -> Vec<(Vec<u8>, String)> {
     out
 }
 
-/// The name a file arrives under. A Mac sends the composed spelling, so the
-/// name stored with a combining accent is the only one that changes there.
-fn arrives_as(sent: &str) -> &str {
-    match sent {
-        "decomposed/soldu\u{301}-5313338.jpg" if cfg!(target_os = "macos") => {
-            "decomposed/sold\u{fa}-5313338.jpg"
-        }
-        other => other,
-    }
-}
-
-/// What the receiving folder holds. The content is what was written, so the
-/// composed name still holds the decomposed text.
+/// What the receiving folder holds: every name as it was written, each file
+/// holding its own name as text.
 fn expected() -> Vec<(Vec<u8>, String)> {
     let mut want: Vec<(Vec<u8>, String)> = NAMES
         .iter()
-        .map(|n| (arrives_as(n).as_bytes().to_vec(), n.to_string()))
+        .map(|n| (n.as_bytes().to_vec(), n.to_string()))
         .collect();
     want.sort();
     want
@@ -89,6 +80,40 @@ async fn a_pull_keeps_every_name_byte_for_byte() {
     let (_, summary) = pull(&a, &b, p.id).await;
     assert!(summary.failures.is_empty(), "{:?}", summary.failures);
     assert_eq!(names(&a.dev().join("media")), expected());
+}
+
+/// A Mac lists a name it stores decomposed by its composed spelling only for
+/// a computer that is not a Mac. Another Mac, and an older version that does
+/// not say what it runs on, get the name as stored.
+#[cfg(target_os = "macos")]
+#[tokio::test]
+async fn a_mac_lists_the_composed_name_only_for_a_computer_that_is_not_a_mac() {
+    use project_transfer::{ignore_rules::IgnoreSpec, model::Os};
+    let (a, b) = pair_full().await;
+    let theirs = b.project_dir("media");
+    write(&theirs, "soldu\u{301}.jpg", "x");
+    let p = b.add_project("Garden", &[("media", &theirs)]).await;
+    let mut conn = a.open(&b).await;
+    for (from_os, listed) in [
+        (Some(Os::Windows), "sold\u{fa}.jpg"),
+        (Some(Os::MacOs), "soldu\u{301}.jpg"),
+        (None, "soldu\u{301}.jpg"),
+    ] {
+        let ask = Request::Manifest {
+            project: p.id,
+            folder: p.primary,
+            ignore: IgnoreSpec::default(),
+            folder_name: "media".into(),
+            project_name: "Garden".into(),
+            multi_folder: false,
+            from_os,
+        };
+        let Response::Manifest(scan) = conn.request(&ask).await.unwrap() else {
+            panic!("no folder scan when asked as {from_os:?}");
+        };
+        let rels: Vec<String> = scan.manifest.entries.into_iter().map(|e| e.rel).collect();
+        assert_eq!(rels, [listed], "asked as {from_os:?}");
+    }
 }
 
 /// A client may send both a write and a removal for two spellings of one
@@ -131,8 +156,8 @@ async fn a_push_that_writes_one_spelling_and_removes_another_keeps_the_file() {
 /// lists the file that way, while this Mac lists its own as the composed "ú".
 /// The plan adds the decomposed name and removes the composed one, which on a
 /// Mac is the same file, and the pull keeps its own applier for each folder it
-/// writes. A Mac no longer lists the decomposed spelling itself, so the plan is
-/// edited by hand to match.
+/// writes. The other computer here is a Mac, so the plan is edited by hand to
+/// match.
 #[cfg(target_os = "macos")]
 #[tokio::test]
 async fn a_pull_that_writes_one_spelling_and_removes_another_keeps_the_file() {
