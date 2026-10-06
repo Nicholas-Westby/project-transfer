@@ -14,6 +14,13 @@ pub(super) fn composed(dir: &Path, name: String, meta: &std::fs::Metadata) -> St
     if nfc == name {
         return name;
     }
+    // NFC also replaces characters that were never decomposed (a compatibility
+    // ideograph, the angstrom sign), and the disk opens the file by either, but
+    // the Mac never held the new name. Letters made of parts, like "u" and an
+    // accent, are the ones to compose: each part stays as it is on its own.
+    if name.chars().any(|c| !c.is_ascii() && changes_alone(c)) {
+        return name;
+    }
     // A disk that keeps the spellings apart (some external ones) has two
     // names here, so the one on disk is the only one that works.
     match std::fs::symlink_metadata(dir.join(&nfc)) {
@@ -25,6 +32,13 @@ pub(super) fn composed(dir: &Path, name: String, meta: &std::fs::Metadata) -> St
 #[cfg(not(target_os = "macos"))]
 pub(super) fn composed(_dir: &Path, name: String, _meta: &std::fs::Metadata) -> String {
     name
+}
+
+/// Whether NFC turns `c` into something else even with nothing around it.
+#[cfg(target_os = "macos")]
+fn changes_alone(c: char) -> bool {
+    let s = c.to_string();
+    nfc(&s) != s
 }
 
 /// `s` in Unicode normalization form C, by Core Foundation.
@@ -80,6 +94,64 @@ mod tests {
         assert_eq!(
             composed(dir.path(), "soldu\u{301}.jpg".into(), &meta),
             "sold\u{fa}.jpg"
+        );
+    }
+
+    #[test]
+    fn a_character_nfc_replaces_on_its_own_keeps_the_name_on_disk() {
+        use std::os::unix::fs::MetadataExt;
+        let dir = tempfile::tempdir().unwrap();
+        // A compatibility ideograph, the angstrom and ohm signs and the Greek
+        // question mark each become another character, and the disk opens the
+        // file by either, but the Mac never held the other name.
+        for c in ['\u{fa10}', '\u{212b}', '\u{2126}', '\u{37e}'] {
+            let name = format!("{c}.txt");
+            let path = dir.path().join(&name);
+            std::fs::write(&path, "x").unwrap();
+            let meta = std::fs::symlink_metadata(&path).unwrap();
+            let replaced = nfc(&name);
+            assert_ne!(replaced, name);
+            let via = std::fs::symlink_metadata(dir.path().join(&replaced)).unwrap();
+            assert_eq!(via.ino(), meta.ino(), "{name:?} opens as {replaced:?} too");
+            assert_eq!(composed(dir.path(), name.clone(), &meta), name);
+        }
+    }
+
+    #[test]
+    fn decomposed_hangul_is_composed() {
+        let dir = tempfile::tempdir().unwrap();
+        let name = "\u{1112}\u{1161}\u{11ab}.txt";
+        let path = dir.path().join(name);
+        std::fs::write(&path, "x").unwrap();
+        let meta = std::fs::symlink_metadata(&path).unwrap();
+        assert_eq!(composed(dir.path(), name.into(), &meta), "\u{d55c}.txt");
+    }
+
+    #[test]
+    fn a_composed_name_that_reaches_another_file_is_not_used() {
+        let dir = tempfile::tempdir().unwrap();
+        std::fs::write(dir.path().join("soldu\u{301}.jpg"), "x").unwrap();
+        let other = dir.path().join("other.txt");
+        std::fs::write(&other, "y").unwrap();
+        // The entry being listed is `other.txt`, so the file the composed
+        // spelling reaches is not it.
+        let meta = std::fs::symlink_metadata(&other).unwrap();
+        assert_eq!(
+            composed(dir.path(), "soldu\u{301}.jpg".into(), &meta),
+            "soldu\u{301}.jpg"
+        );
+    }
+
+    #[test]
+    fn a_composed_name_the_folder_does_not_have_is_not_used() {
+        let listed = tempfile::tempdir().unwrap();
+        let path = listed.path().join("soldu\u{301}.jpg");
+        std::fs::write(&path, "x").unwrap();
+        let meta = std::fs::symlink_metadata(&path).unwrap();
+        let elsewhere = tempfile::tempdir().unwrap();
+        assert_eq!(
+            composed(elsewhere.path(), "soldu\u{301}.jpg".into(), &meta),
+            "soldu\u{301}.jpg"
         );
     }
 }
