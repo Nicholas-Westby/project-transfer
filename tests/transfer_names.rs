@@ -1,6 +1,8 @@
 //! File names beyond plain ASCII arrive exactly as they were sent, byte for
 //! byte, in both directions. A name only ever travels as UTF-8 text, so a
-//! letter can't turn into another one on the way.
+//! letter can't turn into another one on the way. The one change is made
+//! before a name leaves a Mac: it sends the composed spelling of a letter
+//! like "ú", because Windows tells the two spellings apart.
 
 mod support;
 
@@ -40,10 +42,23 @@ fn names(root: &Path) -> Vec<(Vec<u8>, String)> {
     out
 }
 
+/// The name a file arrives under. A Mac sends the composed spelling, so the
+/// name stored with a combining accent is the only one that changes there.
+fn arrives_as(sent: &str) -> &str {
+    match sent {
+        "decomposed/soldu\u{301}-5313338.jpg" if cfg!(target_os = "macos") => {
+            "decomposed/sold\u{fa}-5313338.jpg"
+        }
+        other => other,
+    }
+}
+
+/// What the receiving folder holds. The content is what was written, so the
+/// composed name still holds the decomposed text.
 fn expected() -> Vec<(Vec<u8>, String)> {
     let mut want: Vec<(Vec<u8>, String)> = NAMES
         .iter()
-        .map(|n| (n.as_bytes().to_vec(), n.to_string()))
+        .map(|n| (arrives_as(n).as_bytes().to_vec(), n.to_string()))
         .collect();
     want.sort();
     want
@@ -107,20 +122,32 @@ async fn a_push_that_writes_one_spelling_and_removes_another_keeps_the_file() {
     assert_eq!(read(&dest, "sold\u{fa}.jpg"), "new");
 }
 
-/// The same pair comes out of an ordinary pull, which keeps its own applier
-/// for each folder it writes.
+/// A pull from a computer that lists the file under the other spelling, such
+/// as a Windows PC that kept the decomposed one, plans the same pair, and the
+/// pull keeps its own applier for each folder it writes. A Mac lists both
+/// spellings as one name, so the plan gets its removal by hand.
 #[cfg(target_os = "macos")]
 #[tokio::test]
 async fn a_pull_that_writes_one_spelling_and_removes_another_keeps_the_file() {
+    use project_transfer::{manifest::Change, model::Direction, transfer};
     let (a, b) = pair_full().await;
     let theirs = b.project_dir("media");
     write(&theirs, "keep.txt", "k");
     let p = b.add_project("Garden", &[("media", &theirs)]).await;
     pull(&a, &b, p.id).await;
     write(&theirs, "sold\u{fa}.jpg", "new");
+    let mut conn = a.open(&b).await;
+    let req = a.request(&b, p.id, Direction::Pull).await;
+    let mut preview = transfer::prepare(&mut conn, &a.shared, req).await.unwrap();
     let mine = a.dev().join("media");
     write(&mine, "soldu\u{301}.jpg", "old");
-    let (_, summary) = pull(&a, &b, p.id).await;
+    let remove = Change::RemoveFile("soldu\u{301}.jpg".into());
+    preview.folders[0].plan.changes.push(remove);
+    let (tx, _rx) = tokio::sync::mpsc::unbounded_channel();
+    let cancel = Default::default();
+    let summary = transfer::execute(&mut conn, &a.shared, preview, tx, cancel)
+        .await
+        .unwrap();
     assert!(summary.failures.is_empty(), "{:?}", summary.failures);
     assert_eq!(read(&mine, "sold\u{fa}.jpg"), "new");
 }

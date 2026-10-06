@@ -34,6 +34,7 @@ pub struct Manifest {
 
 mod compare;
 mod scan;
+mod spelling;
 
 pub use compare::{Change, Plan, compare, resolve_hashes};
 pub use scan::{hash_file, scan};
