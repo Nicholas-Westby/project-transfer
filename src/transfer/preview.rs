@@ -16,12 +16,22 @@ pub struct TransferRequest {
 pub struct Preview {
     pub request: TransferRequest,
     pub folders: Vec<FolderPreview>,
+    /// Folders of the project this transfer skips, so the sheet can still
+    /// name every folder and say why.
+    pub left_out: Vec<LeftOut>,
     pub warnings: Vec<String>,
     /// The other computer's ids this computer's project takes on when the
     /// transfer runs; `request.project` is already the new id.
     pub link: Option<super::link::Link>,
     /// The transfer changes the description on the receiving computer.
     pub description: bool,
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct LeftOut {
+    pub name: String,
+    /// A full sentence: what is wrong and what to do.
+    pub reason: String,
 }
 
 #[derive(Clone, Debug, PartialEq)]

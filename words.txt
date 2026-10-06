@@ -2456,6 +2456,7 @@ second
 secondary
 seconds
 secret
+secrets
 secretword
 secs
 section
@@ -3073,6 +3074,7 @@ viewed
 viewport
 virtual
 visible
+visits
 visuals
 vivid
 void

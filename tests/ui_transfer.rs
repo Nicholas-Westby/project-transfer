@@ -71,3 +71,12 @@ fn a_running_transfer_shows_elapsed_and_remaining_time() {
     let text = line.accesskit_node().value().unwrap_or_default();
     assert!(text.starts_with("12 min "), "{text}");
 }
+
+#[test]
+fn the_sheet_names_folders_it_leaves_out() {
+    let fake = FakeBackend::seeded();
+    fake.update(|s| s.transfer = TransferState::Ready(sample_preview(s)));
+    let h = ui_harness(fake);
+    h.get_by_label("Left out.");
+    h.get_by_label_contains("pushing it would empty the copy");
+}

@@ -1,7 +1,7 @@
 //! Building the preview: scan both sides, compare, hash only what is unclear.
 
 use super::preview::{
-    FolderPreview, Preview, Replaced, TransferRequest, drop_unholdable, replaced_folders,
+    FolderPreview, LeftOut, Preview, Replaced, TransferRequest, drop_unholdable, replaced_folders,
 };
 use super::projects::{check_names_for, default_path};
 use super::{link, safe_join};
@@ -95,6 +95,7 @@ pub async fn prepare(
         spec,
         project: req.project,
         warnings,
+        left_out: Vec::new(),
     };
     let mut folders = Vec::new();
     let description;
@@ -112,11 +113,13 @@ pub async fn prepare(
             let multi = p.folders.len() > 1;
             for f in &p.folders {
                 let Some(root) = f.local_path.clone().filter(|r| r.is_dir()) else {
-                    ctx.warnings.push(format!(
-                        "Folder `{}` was left out: it is not on this computer, and pushing it \
-                         would empty the copy on {peer}.",
-                        f.name
-                    ));
+                    ctx.leave_out(
+                        &f.name,
+                        format!(
+                            "It is not on this computer, and pushing it would empty the copy \
+                             on {peer}."
+                        ),
+                    );
                     continue;
                 };
                 let remote = ctx.remote_scan(f.id, &f.name, &p.name, multi).await?;
@@ -159,11 +162,10 @@ pub async fn prepare(
             for rf in &info.folders {
                 let remote = ctx.remote_scan(rf.id, &rf.name, &info.name, multi).await?;
                 if !remote.set_up || !remote.exists {
-                    ctx.warnings.push(format!(
-                        "Folder `{}` was left out: it is not on {peer}, and pulling it would \
-                         empty the copy here.",
-                        rf.name
-                    ));
+                    ctx.leave_out(
+                        &rf.name,
+                        format!("It is not on {peer}, and pulling it would empty the copy here."),
+                    );
                     continue;
                 }
                 let known = local
@@ -182,8 +184,7 @@ pub async fn prepare(
                     ) {
                         Ok(p) => p,
                         Err(reason) => {
-                            ctx.warnings
-                                .push(format!("Folder `{}` was left out: {reason}", rf.name));
+                            ctx.leave_out(&rf.name, reason);
                             continue;
                         }
                     },
@@ -206,11 +207,26 @@ pub async fn prepare(
                 };
                 folders.push(ctx.plan(side).await?);
             }
+            // Folders only this computer has: pull never visits them, so say so
+            // rather than leave them out without a word.
+            let theirs: Vec<FolderId> = info.folders.iter().map(|f| f.id).collect();
+            for f in local.iter().flat_map(|p| &p.folders) {
+                if !theirs.contains(&f.id) {
+                    ctx.leave_out(
+                        &f.name,
+                        format!(
+                            "{peer} doesn't have this folder yet. Sync details with {peer} \
+                             to add it there, then pull again."
+                        ),
+                    );
+                }
+            }
         }
     }
     Ok(Preview {
         request: req,
         folders,
+        left_out: ctx.left_out,
         warnings: ctx.warnings,
         link,
         description,
@@ -231,6 +247,7 @@ struct Ctx<'a> {
     spec: IgnoreSpec,
     project: ProjectId,
     warnings: Vec<String>,
+    left_out: Vec<LeftOut>,
 }
 
 /// One folder's two sides: (manifest, display path) each.
@@ -247,6 +264,13 @@ struct Sides {
 }
 
 impl Ctx<'_> {
+    fn leave_out(&mut self, name: &str, reason: String) {
+        self.left_out.push(LeftOut {
+            name: name.to_string(),
+            reason,
+        });
+    }
+
     async fn remote_scan(
         &mut self,
         folder: FolderId,

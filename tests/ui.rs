@@ -268,6 +268,7 @@ fn nothing_to_push_names_the_folders_it_compared() {
             f.replaced.clear();
         }
         p.warnings.clear();
+        p.left_out.clear();
         s.transfer = TransferState::Ready(p);
     });
     let h = ui_harness(fake);

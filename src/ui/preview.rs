@@ -222,6 +222,7 @@ mod tests {
                 skipped: vec![("aux.txt".into(), "`aux.txt` is reserved on Windows.".into())],
                 replaced: vec![],
             }],
+            left_out: Vec::new(),
             warnings: vec![],
             link: None,
             description: false,

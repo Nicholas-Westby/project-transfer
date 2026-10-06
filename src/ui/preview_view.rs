@@ -129,4 +129,11 @@ pub fn folder_lines(ui: &mut Ui, p: &Preview) {
             widgets::small_muted(ui, format!("{} will be created.", f.dest_path));
         }
     }
+    for l in &p.left_out {
+        ui.horizontal_wrapped(|ui| {
+            ui.label(RichText::new(&l.name).strong().color(pal.ink));
+            ui.label(RichText::new("Left out.").color(pal.changed));
+            ui.add(egui::Label::new(ticks(&l.reason, pal.muted())).wrap());
+        });
+    }
 }
