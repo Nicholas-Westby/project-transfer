@@ -3,7 +3,7 @@
 mod ui_support;
 
 use egui_kittest::kittest::{NodeT, Queryable};
-use project_transfer::core::{ActivityKind, ActivityLine};
+use project_transfer::core::{ActivityKind, ActivityLine, TransferState};
 use ui_support::{FakeBackend, NoPicker, SIZE, build};
 
 /// The smallest window `main` allows.
@@ -81,5 +81,40 @@ fn a_folder_not_set_up_here_keeps_its_instruction_on_one_line_when_there_is_room
     assert_eq!(lines.len(), 3);
     for height in lines {
         assert!(height < 30.0, "wrapped to {height} points");
+    }
+}
+
+/// The sheet is pinned at the top, so a taller path would move the button.
+#[test]
+fn a_long_path_keeps_the_transfer_sheet_the_same_height() {
+    let name = "tomato_raised_bed_seed_photos_plant-data.jpg";
+    let long = format!(
+        "{}{name}",
+        "src/garden-planner/assets/images/seed-catalog/".repeat(8)
+    );
+    let running = |current: &str| TransferState::Running {
+        done: 5_400_000_000,
+        total: 10_000_000_000,
+        files: 25_731,
+        current: current.into(),
+    };
+    // Each display scale rounds a row of text to whole pixels in its own way.
+    for ppp in [1.0, 1.5, 2.25] {
+        let fake = FakeBackend::seeded();
+        fake.update(|s| s.transfer = running("src/a.txt"));
+        let mut h = build(fake.clone(), Box::new(NoPicker), SIZE, ppp, false);
+        h.run();
+        let short = h.get_by_label("Cancel transfer").rect();
+        fake.update(|s| s.transfer = running(&long));
+        h.run();
+        let cancel = h.get_by_label("Cancel transfer").rect();
+        assert_eq!(cancel, short, "at {ppp} pixels per point");
+        // A label keeps its text in the node's value, not its label.
+        let shown = h
+            .get_by_label_contains(name)
+            .accesskit_node()
+            .value()
+            .unwrap_or_default();
+        assert!(shown.contains('…') && shown.ends_with(name), "{shown}");
     }
 }

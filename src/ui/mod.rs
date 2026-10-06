@@ -20,6 +20,7 @@ mod session_bar;
 mod settings;
 pub mod theme;
 mod transfer_bar;
+mod transfer_running;
 mod transfer_sheet;
 pub mod widgets;
 

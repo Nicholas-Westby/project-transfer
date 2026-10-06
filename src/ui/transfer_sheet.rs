@@ -3,12 +3,12 @@
 
 use super::theme::Palette;
 use super::widgets::{self, plural};
-use super::{App, dialogs, preview, preview_view};
+use super::{App, dialogs, preview, preview_view, transfer_running};
 use crate::core::{Action, TransferState, UiState};
 use crate::model::Direction;
 use crate::transfer::{Preview, Summary};
 use crate::units::{size, speed, took};
-use egui::{ProgressBar, RichText, Ui};
+use egui::{RichText, Ui};
 use std::time::Duration;
 
 const WIDTH: f32 = 680.0;
@@ -85,28 +85,7 @@ impl App {
                 };
                 let r = dialogs::sheet(ui, "transfer_running", width, false, |ui| {
                     dialogs::sheet_title(ui, &title);
-                    let frac = if *total == 0 {
-                        0.0
-                    } else {
-                        *done as f32 / *total as f32
-                    };
-                    ui.add(ProgressBar::new(frac).desired_height(8.0));
-                    ui.add_space(4.0);
-                    widgets::small_muted(
-                        ui,
-                        format!(
-                            "{} of {}, {}",
-                            size(*done),
-                            size(*total),
-                            plural(*files, "file", "files")
-                        ),
-                    );
-                    ui.label(widgets::mono(current).color(Palette::of(ui.ctx()).muted()));
-                    widgets::small_muted(
-                        ui,
-                        "Cancelling keeps the files already copied. Nothing is left half-written.",
-                    );
-                    cancel_row(ui, "Cancel transfer")
+                    transfer_running::body(ui, *done, *total, *files, current)
                 });
                 r.inner.then_some(Action::CancelTransfer)
             }
