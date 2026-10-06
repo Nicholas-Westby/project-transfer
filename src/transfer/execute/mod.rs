@@ -23,9 +23,11 @@ use tracing::warn;
 mod ops;
 mod plan;
 mod stream;
+mod window;
 
 use super::Op;
 use plan::{content, is_dir_change, totals, written_rel};
+use window::{Awaiting, Counts};
 
 const CANCELLED: &str = "The transfer was cancelled. Files already copied stay in place.";
 
@@ -46,6 +48,7 @@ pub async fn execute(
         last_progress: Instant::now(),
         direction: preview.request.direction,
         here: String::new(),
+        in_flight: Default::default(),
     };
     match run.all(shared, &preview).await {
         Ok(()) => {
@@ -71,6 +74,8 @@ struct Run<'a> {
     direction: Direction,
     /// The current folder as it is on this computer, for the log.
     here: String,
+    /// Requests sent whose answers have not been read, oldest first.
+    in_flight: std::collections::VecDeque<Awaiting>,
 }
 
 /// Where the current folder's files come from and go to.
@@ -217,27 +222,28 @@ impl Run<'_> {
         let changes = &fp.plan.changes;
         for c in changes.iter().filter(|c| is_dir_change(c)) {
             let rel = written_rel(c);
-            self.simple(side, rel, Op::MakeDir).await?;
+            self.simple(side, rel, Op::MakeDir, Counts::Nothing).await?;
         }
         for e in changes.iter().filter_map(content) {
             self.check_cancel()?;
             match &e.kind {
                 Kind::Symlink { target } => {
-                    if self.simple(side, &e.rel, Op::Symlink(target)).await? {
-                        self.summary.files += 1;
-                    }
+                    let op = Op::Symlink(target);
+                    self.simple(side, &e.rel, op, Counts::File(0)).await?
                 }
                 _ => self.file(side, &e.rel).await?,
             }
         }
+        // Content lands before times and removals, as it always has.
+        self.settle_all(side).await?;
         for c in changes {
             if let Change::TimestampOnly(Entry {
                 rel,
                 kind: Kind::File { mtime_ms, .. },
             }) = c
-                && self.simple(side, rel, Op::SetMtime(*mtime_ms)).await?
             {
-                self.summary.files += 1;
+                let op = Op::SetMtime(*mtime_ms);
+                self.simple(side, rel, op, Counts::File(0)).await?;
             }
         }
         for c in changes {
@@ -247,11 +253,11 @@ impl Run<'_> {
                 _ => continue,
             };
             self.check_cancel()?;
-            if self.simple(side, rel, Op::Remove(is_dir)).await? {
-                self.summary.removed += 1;
-            }
+            let op = Op::Remove(is_dir);
+            self.simple(side, rel, op, Counts::Removal).await?;
         }
-        Ok(())
+        // The next request needs its own answer, which comes after these.
+        self.settle_all(side).await
     }
 
     fn check_cancel(&self) -> anyhow::Result<()> {
