@@ -9,6 +9,7 @@ use project_transfer::transfer::Summary;
 use project_transfer::ui::{App, FolderPicker};
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
+use std::time::{Duration, Instant};
 
 struct FixedPicker;
 
@@ -70,6 +71,8 @@ pub fn all(dir: &Path) {
                 total: 9_800_000,
                 files: 42,
                 current: "app/src/plants/tomato.rs".into(),
+                started: Instant::now() - Duration::from_secs(754),
+                left: Some(Duration::from_secs(1_500)),
             }
         });
         h.run_ok();

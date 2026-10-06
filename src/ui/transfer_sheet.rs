@@ -78,6 +78,8 @@ impl App {
                 total,
                 files,
                 current,
+                started,
+                left,
             } => {
                 let title = match dir {
                     Direction::Push => format!("Pushing {project} to {peer}"),
@@ -85,7 +87,7 @@ impl App {
                 };
                 let r = dialogs::sheet(ui, "transfer_running", width, false, |ui| {
                     dialogs::sheet_title(ui, &title);
-                    transfer_running::body(ui, *done, *total, *files, current)
+                    transfer_running::body(ui, *done, *total, *files, current, *started, *left)
                 });
                 r.inner.then_some(Action::CancelTransfer)
             }

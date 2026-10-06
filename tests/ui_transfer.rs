@@ -3,10 +3,11 @@
 mod ui_support;
 
 use egui_kittest::Harness;
-use egui_kittest::kittest::Queryable;
+use egui_kittest::kittest::{NodeT, Queryable};
 use project_transfer::core::TransferState;
 use project_transfer::transfer::Summary;
 use project_transfer::ui::App;
+use std::time::{Duration, Instant};
 use ui_support::{FakeBackend, sample_preview, ui_harness};
 
 /// The sheet after a transfer that ended with `summary`. A preview comes
@@ -42,4 +43,28 @@ fn a_transfer_too_small_to_measure_gives_no_speed() {
     });
     h.get_by_label_contains("in 1 min 15 s.");
     h.get_by_label("14 bytes sent.");
+}
+
+#[test]
+fn a_running_transfer_shows_elapsed_and_remaining_time() {
+    let fake = FakeBackend::seeded();
+    let mut h = ui_harness(fake.clone());
+    // Set after the harness is built, so little of the real clock runs before
+    // the sheet is read.
+    fake.update(|s| {
+        s.transfer = TransferState::Running {
+            done: 5_400_000_000,
+            total: 10_000_000_000,
+            files: 25_731,
+            current: "src/a.txt".into(),
+            started: Instant::now() - Duration::from_secs(754),
+            left: Some(Duration::from_secs(1_500)),
+        }
+    });
+    h.run();
+    // The seconds are the real clock's, so they may have moved on by now.
+    let line = h.get_by_label_contains("elapsed, about 25 min left");
+    // A label keeps its text in the node's value, not its label.
+    let text = line.accesskit_node().value().unwrap_or_default();
+    assert!(text.starts_with("12 min "), "{text}");
 }
