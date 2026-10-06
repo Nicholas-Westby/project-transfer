@@ -263,6 +263,7 @@ appropriate
 apps
 april
 arc
+archive
 are
 area
 area's
@@ -352,6 +353,7 @@ basil
 batch
 baz
 bb
+bbbbbb
 be
 beat
 beats
@@ -575,6 +577,7 @@ click
 clicked
 clicks
 client
+clients
 clipped
 clippy
 clock
@@ -642,6 +645,7 @@ commits
 committed
 common
 communities
+community-allotment
 compact
 compare
 compared
@@ -757,6 +761,7 @@ current
 cursor
 custom
 cut
+cuts
 cwd
 cx
 cy
@@ -1208,6 +1213,7 @@ formats
 formatter
 formed
 forms
+fot
 foto
 fotos
 found
@@ -1390,6 +1396,7 @@ hour
 hours
 hover
 hovered
+hovering
 how
 however
 http
@@ -1740,6 +1747,7 @@ matcher
 matches
 matching
 matter
+matters
 max
 may
 mb
@@ -2672,6 +2680,7 @@ shell
 shop
 short
 shortcut
+shortened
 shot
 shots
 should

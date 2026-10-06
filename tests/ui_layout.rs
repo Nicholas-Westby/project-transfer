@@ -41,6 +41,8 @@ fn nothing_runs_past_the_right_edge_of_the_smallest_window() {
         let p = &mut s.projects[0];
         p.name = "garden-planner-for-the-community-allotment-beds".into();
         p.folders[0].name = "garden-planner-web-application-frontend-next".into();
+        p.folders[1].local_path =
+            Some("/Volumes/Projects/clients/community-allotment/garden-planner/plant-data".into());
         p.commands[1].line =
             "cargo run --release -- --config ./config/production.toml --verbose".into();
         s.activity.push(ActivityLine {
@@ -87,13 +89,28 @@ fn a_folder_not_set_up_here_keeps_its_instruction_on_one_line_when_there_is_room
     });
     let h = build(fake, Box::new(NoPicker), SIZE, 1.0, false);
     let lines = h
-        .get_all_by_label("Choose where this folder lives on this computer.")
+        .get_all_by_label_contains("lives on this computer.")
         .map(|n| n.rect().height())
         .collect::<Vec<_>>();
     assert_eq!(lines.len(), 3);
     for height in lines {
         assert!(height < 30.0, "wrapped to {height} points");
     }
+}
+
+#[test]
+fn a_long_folder_path_keeps_its_start_and_last_folder() {
+    let fake = FakeBackend::seeded();
+    let long =
+        "/Volumes/Projects/clients/community-allotment/garden-planner/archive/2026/plant-data";
+    fake.update(|s| s.projects[0].folders[1].local_path = Some(long.into()));
+    let h = build(fake, Box::new(NoPicker), SMALLEST, 1.0, false);
+    // A label keeps its text in the node's value, not its label.
+    let shown = h
+        .get_all_by_label_contains("/Volumes/")
+        .find_map(|n| n.accesskit_node().value())
+        .unwrap_or_default();
+    assert!(shown.ends_with("…/plant-data"), "{shown}");
 }
 
 /// The sheet is pinned at the top, so a taller path would move the button.
