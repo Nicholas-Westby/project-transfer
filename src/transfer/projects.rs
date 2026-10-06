@@ -1,7 +1,7 @@
 //! Project bookkeeping both sides of a transfer share: where a folder lands,
 //! taking in a project from the other computer, commands and records.
 
-use super::apply::validate_name;
+use super::validate_name;
 use crate::merge::merge_commands;
 use crate::model::{
     Command, Direction, Folder, FolderId, InstanceId, Project, ProjectId, TransferRecord,

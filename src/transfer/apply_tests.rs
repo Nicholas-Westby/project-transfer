@@ -15,35 +15,6 @@ fn names(dir: &Path) -> Vec<String> {
 }
 
 #[test]
-fn bad_rels_are_refused() {
-    for rel in [
-        "", "/a", "\\a", "C:", "c:/x", "C:x", "a/../b", "..", "./a", "a/./b", "a//b", "a/", "a\0b",
-        "a\\..\\b", "..\\x", "a\\b", "dir/x\\y",
-    ] {
-        assert!(validate_rel(rel).is_err(), "{rel:?} should be refused");
-    }
-    for rel in [
-        "a",
-        "a/b.txt",
-        ".git/config",
-        "a..b",
-        "...",
-        "ab:c",
-        "a b/c",
-    ] {
-        assert!(validate_rel(rel).is_ok(), "{rel:?} should pass");
-    }
-}
-
-#[test]
-fn bad_names_are_refused() {
-    for n in ["", ".", "..", "a/b", "a\\b", "C:", "a\0"] {
-        assert!(validate_name(n).is_err(), "{n:?}");
-    }
-    assert!(validate_name("My project").is_ok());
-}
-
-#[test]
 fn finished_file_has_content_mtime_and_no_temp() {
     let t = tempfile::tempdir().unwrap();
     let a = Applier::new(t.path().to_path_buf());
@@ -157,6 +128,70 @@ fn remove_handles_files_dirs_and_missing() {
     a.remove("never", false).unwrap();
     a.remove("never/deeper", true).unwrap();
     assert!(names(t.path()).is_empty());
+}
+
+#[test]
+fn removing_a_file_not_written_here_still_removes_it() {
+    let t = tempfile::tempdir().unwrap();
+    std::fs::write(t.path().join("old.txt"), "x").unwrap();
+    let a = Applier::new(t.path().to_path_buf());
+    a.remove("old.txt", false).unwrap();
+    assert!(!t.path().join("old.txt").exists());
+}
+
+// A Mac treats the two spellings of "ú" as one name, so a plan that writes one
+// and removes the other would delete what it just wrote.
+#[cfg(target_os = "macos")]
+#[test]
+fn removing_another_spelling_of_a_file_just_written_keeps_it() {
+    let t = tempfile::tempdir().unwrap();
+    let a = Applier::new(t.path().to_path_buf());
+    std::fs::write(t.path().join("soldu\u{301}.jpg"), "old").unwrap();
+    let mut p = a.begin_file("sold\u{fa}.jpg").unwrap();
+    p.write(b"new").unwrap();
+    p.finish(0, false).unwrap();
+    a.remove("soldu\u{301}.jpg", false).unwrap();
+    assert_eq!(names(t.path()).len(), 1, "{:?}", names(t.path()));
+    let kept = std::fs::read_to_string(t.path().join("sold\u{fa}.jpg"));
+    assert_eq!(kept.unwrap(), "new");
+}
+
+#[cfg(target_os = "macos")]
+#[test]
+fn removing_another_spelling_of_a_folder_just_made_keeps_its_files() {
+    let t = tempfile::tempdir().unwrap();
+    let a = Applier::new(t.path().to_path_buf());
+    std::fs::create_dir(t.path().join("Cafe\u{301}")).unwrap();
+    a.make_dir("Caf\u{e9}").unwrap();
+    let mut p = a.begin_file("Caf\u{e9}/menu.md").unwrap();
+    p.write(b"soup").unwrap();
+    p.finish(0, false).unwrap();
+    a.remove("Cafe\u{301}", true).unwrap();
+    let kept = std::fs::read_to_string(t.path().join("Caf\u{e9}/menu.md"));
+    assert_eq!(kept.unwrap(), "soup");
+}
+
+#[cfg(target_os = "macos")]
+#[test]
+fn removing_another_spelling_of_a_folder_that_replaced_a_file_keeps_it() {
+    let t = tempfile::tempdir().unwrap();
+    let a = Applier::new(t.path().to_path_buf());
+    std::fs::write(t.path().join("Cafe\u{301}"), "old").unwrap();
+    a.make_dir("Caf\u{e9}").unwrap();
+    a.remove("Cafe\u{301}", false).unwrap();
+    assert!(t.path().join("Caf\u{e9}").is_dir());
+}
+
+#[cfg(target_os = "macos")]
+#[test]
+fn removing_another_spelling_of_a_link_just_made_keeps_it() {
+    let t = tempfile::tempdir().unwrap();
+    let a = Applier::new(t.path().to_path_buf());
+    std::fs::write(t.path().join("lieu\u{301}"), "old").unwrap();
+    a.make_symlink("lie\u{fa}", "elsewhere").unwrap();
+    a.remove("lieu\u{301}", false).unwrap();
+    let kept = std::fs::read_link(t.path().join("lie\u{fa}"));
+    assert_eq!(kept.unwrap(), PathBuf::from("elsewhere"));
 }
 
 #[test]

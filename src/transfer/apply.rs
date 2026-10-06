@@ -1,89 +1,16 @@
 //! Writes a mirror to disk without ever leaving a half-written file.
 
+use super::paths::{invalid, safe_join};
+use std::collections::HashSet;
 use std::fs::File;
 use std::io::{self, Write};
 use std::path::{Path, PathBuf};
+use std::sync::{Arc, Mutex, MutexGuard};
+use tracing::info;
 
 const TEMP_SUFFIX: &str = ".pt-tmp";
 /// Keeps "<name>.<rand>.pt-tmp" under the usual 255-byte name limit.
 const TEMP_NAME_KEEP: usize = 200;
-
-/// Checks a '/' separated path that came from another computer before it is
-/// joined onto a folder. Returns a sentence saying what is wrong.
-pub fn validate_rel(rel: &str) -> Result<(), String> {
-    let bad = |why: &str| Err(format!("The path \"{rel}\" is not allowed: {why}."));
-    if rel.is_empty() {
-        return bad("it is empty");
-    }
-    if rel.contains('\0') {
-        return bad("it contains a NUL character");
-    }
-    if rel.starts_with('/') || rel.starts_with('\\') {
-        return bad("it is absolute");
-    }
-    let b = rel.as_bytes();
-    if b.len() >= 2 && b[0].is_ascii_alphabetic() && b[1] == b':' {
-        return bad("it starts with a drive letter");
-    }
-    // Backslash separates on Windows, so it could hide a ".." or a link
-    // from the checks below; such a name cannot exist there anyway.
-    if rel.contains('\\') {
-        return bad("it contains a backslash");
-    }
-    for part in rel.split('/') {
-        match part {
-            "" => return bad("it has an empty part"),
-            "." | ".." => return bad("it has a \".\" or \"..\" part"),
-            _ => {}
-        }
-        #[cfg(windows)]
-        if crate::naming::windows_problem(part).is_some() {
-            return bad("Windows cannot hold one of its names");
-        }
-    }
-    Ok(())
-}
-
-/// Checks a project or folder name used as one path component.
-pub fn validate_name(name: &str) -> Result<(), String> {
-    validate_rel(name)?;
-    if name.contains(['/', '\\']) {
-        return Err(format!(
-            "The name \"{name}\" is not allowed: it contains a slash."
-        ));
-    }
-    Ok(())
-}
-
-fn invalid(msg: String) -> io::Error {
-    io::Error::new(io::ErrorKind::InvalidInput, msg)
-}
-
-/// Joins a validated `rel` onto `root` component by component, refusing a
-/// path that passes through a symbolic link, which could lead outside `root`.
-pub fn safe_join(root: &Path, rel: &str) -> io::Result<PathBuf> {
-    validate_rel(rel).map_err(invalid)?;
-    let parts: Vec<&str> = rel.split('/').collect();
-    let mut path = root.to_path_buf();
-    let mut checking = true;
-    for (i, part) in parts.iter().enumerate() {
-        path.push(part);
-        if !checking || i + 1 == parts.len() {
-            continue;
-        }
-        match std::fs::symlink_metadata(&path) {
-            Ok(m) if m.file_type().is_symlink() => {
-                return Err(invalid(format!(
-                    "The path \"{rel}\" is not allowed: it passes through a symbolic link."
-                )));
-            }
-            Ok(_) => {}
-            // Nothing below a missing component can be a link.
-            Err(_) => checking = false,
-        }
-    }
-    Ok(path)
-}
 
 fn ms_to_filetime(ms: i64) -> filetime::FileTime {
     filetime::FileTime::from_unix_time(
@@ -147,8 +74,47 @@ fn temp_beside(dest: &Path) -> PathBuf {
     dest.with_file_name(format!("{}.{rand}{TEMP_SUFFIX}", &name[..cut]))
 }
 
+/// What the disk calls a file or folder, whatever spelling reached it.
+#[cfg(unix)]
+fn identity(m: &std::fs::Metadata) -> Option<(u64, u64)> {
+    use std::os::unix::fs::MetadataExt;
+    Some((m.dev(), m.ino()))
+}
+
+/// Windows tells spellings apart except by case, and the preview already
+/// keeps back removals that differ only by case.
+#[cfg(not(unix))]
+fn identity(_: &std::fs::Metadata) -> Option<(u64, u64)> {
+    None
+}
+
+/// Looks at the entry itself and never at what a link points to, since a
+/// removal takes the link away, not its target.
+fn identity_at(path: &Path) -> Option<(u64, u64)> {
+    identity(&std::fs::symlink_metadata(path).ok()?)
+}
+
+type Written = Arc<Mutex<HashSet<(u64, u64)>>>;
+
+/// A lock poisoned by a panic elsewhere must not stop a removal.
+fn lock(written: &Written) -> MutexGuard<'_, HashSet<(u64, u64)>> {
+    written.lock().unwrap_or_else(|p| p.into_inner())
+}
+
+/// Notes what is at `path` as written, once it is in place.
+fn note(written: &Written, path: &Path) {
+    if let Some(id) = identity_at(path) {
+        lock(written).insert(id);
+    }
+}
+
 pub struct Applier {
     root: PathBuf,
+    /// Files and folders this transfer wrote or made, by what the disk calls
+    /// them. Another spelling of a name (case, or composed against decomposed
+    /// letters on a Mac) can reach the same file, and removing that spelling
+    /// must not delete what was just written.
+    written: Written,
 }
 
 /// A file being received. Dropping it without `finish` deletes the temp file,
@@ -157,11 +123,15 @@ pub struct PendingFile {
     file: Option<File>,
     tmp: PathBuf,
     dest: PathBuf,
+    written: Written,
 }
 
 impl Applier {
     pub fn new(root: PathBuf) -> Applier {
-        Applier { root }
+        Applier {
+            root,
+            written: Written::default(),
+        }
     }
 
     pub fn root(&self) -> &Path {
@@ -182,20 +152,26 @@ impl Applier {
             file: Some(file),
             tmp,
             dest,
+            written: self.written.clone(),
         })
     }
 
     pub fn make_dir(&self, rel: &str) -> io::Result<()> {
         let path = safe_join(&self.root, rel)?;
         match std::fs::symlink_metadata(&path) {
-            Ok(m) if m.is_dir() => return Ok(()),
+            Ok(m) if m.is_dir() => {
+                note(&self.written, &path);
+                return Ok(());
+            }
             Ok(_) => {
                 make_writable(&path);
                 std::fs::remove_file(&path)?
             }
             Err(_) => {}
         }
-        std::fs::create_dir_all(&path)
+        std::fs::create_dir_all(&path)?;
+        note(&self.written, &path);
+        Ok(())
     }
 
     pub fn make_symlink(&self, rel: &str, target: &str) -> io::Result<()> {
@@ -213,7 +189,9 @@ impl Applier {
             std::os::unix::fs::symlink(target, &tmp)?;
             std::fs::rename(&tmp, &path).inspect_err(|_| {
                 let _ = std::fs::remove_file(&tmp);
-            })
+            })?;
+            note(&self.written, &path);
+            Ok(())
         }
         #[cfg(not(unix))]
         {
@@ -236,9 +214,18 @@ impl Applier {
 
     /// Removes a file, link or whole folder; `is_dir` is the sender's view
     /// and the disk decides, since the mirror wants it gone either way.
+    /// Whatever this transfer wrote stays, under any spelling.
     pub fn remove(&self, rel: &str, is_dir: bool) -> io::Result<()> {
         let _ = is_dir;
-        clear(&safe_join(&self.root, rel)?)
+        let path = safe_join(&self.root, rel)?;
+        if identity_at(&path).is_some_and(|id| lock(&self.written).contains(&id)) {
+            info!(
+                "kept {rel:?} in {}: this transfer just wrote it under another spelling",
+                self.root.display()
+            );
+            return Ok(());
+        }
+        clear(&path)
     }
 
     pub fn sweep_temp(&self) -> io::Result<u64> {
@@ -285,7 +272,9 @@ impl PendingFile {
             std::fs::remove_dir_all(&self.dest)?;
         }
         make_writable(&self.dest);
-        std::fs::rename(&self.tmp, &self.dest)
+        std::fs::rename(&self.tmp, &self.dest)?;
+        note(&self.written, &self.dest);
+        Ok(())
     }
 }
 
