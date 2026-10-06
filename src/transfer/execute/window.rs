@@ -6,8 +6,9 @@ use super::{CANCELLED, Run, Side};
 use crate::protocol::Response;
 use crate::transfer::prepare::unexpected;
 
-/// How many requests may wait for their answers. Only answers can pile up
-/// unread, and this many small ones fit in any socket buffer, so neither
+/// How many requests may wait for their answers. The computer that is not
+/// reading has at most this many small messages waiting for it (answers in a
+/// push, file requests in a pull), which fit in any socket buffer, so neither
 /// computer blocks on a write the other is not reading.
 pub(super) const WINDOW: usize = 32;
 
