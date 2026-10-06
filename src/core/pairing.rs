@@ -266,6 +266,10 @@ impl Core {
                 }
             }
             NetEvent::Log(text) => self.ui.info(text),
+            NetEvent::ProjectsChanged(text) => {
+                self.sync_projects().await;
+                self.ui.info(text);
+            }
         }
     }
 }

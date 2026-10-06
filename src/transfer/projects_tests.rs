@@ -25,7 +25,7 @@ fn project(folders: Vec<Folder>) -> Project {
 fn default_path_single_and_multi() {
     let pf = Path::new("/dev");
     let (pid, id) = (Uuid::new_v4(), Uuid::new_v4());
-    let d = |name: &str, f: &str, multi| default_path(pf, &[], pid, name, id, f, multi);
+    let d = |name: &str, f: &str, multi| default_path(pf, &[], pid, name, id, f, multi, None);
     assert_eq!(d("Garden", "app", false).unwrap(), Path::new("/dev/app"));
     assert_eq!(
         d("Garden", "app", true).unwrap(),
@@ -43,27 +43,28 @@ fn default_path_avoids_other_projects_folders() {
     let mut nested = project(vec![folder("x", Some("/dev/Garden"))]);
     let (pid, id) = (Uuid::new_v4(), Uuid::new_v4());
     let all = vec![other.clone(), nested.clone()];
-    let d = |multi| default_path(pf, &all, pid, "Garden", id, "app", multi).unwrap();
+    let d = |multi| default_path(pf, &all, pid, "Garden", id, "app", multi, None).unwrap();
     assert_eq!(d(false), Path::new("/dev/app 2"));
     // `/dev/Garden` is another project's folder, so this project's moves.
     assert_eq!(d(true), Path::new("/dev/Garden 2/app"));
 
     // An existing folder of another project that contains the default.
     other.folders[0].local_path = Some("/dev".into());
-    let err = default_path(pf, &[other.clone()], pid, "Garden", id, "app", false).unwrap_err();
+    let err =
+        default_path(pf, &[other.clone()], pid, "Garden", id, "app", false, None).unwrap_err();
     assert!(err.contains("/dev"), "{err}");
 
     // Nor inside the project's own folder: pushing that one would carry it.
     nested.id = pid;
-    let own = default_path(pf, &[nested.clone()], pid, "Garden", id, "app", true).unwrap();
+    let own = default_path(pf, &[nested.clone()], pid, "Garden", id, "app", true, None).unwrap();
     assert_eq!(own, Path::new("/dev/Garden 2/app"));
     // Its own folders beside each other are fine, and a folder's own path
     // never blocks itself.
     nested.folders[0].local_path = Some("/dev/Garden/x".into());
-    let beside = default_path(pf, &[nested.clone()], pid, "Garden", id, "app", true).unwrap();
+    let beside = default_path(pf, &[nested.clone()], pid, "Garden", id, "app", true, None).unwrap();
     assert_eq!(beside, Path::new("/dev/Garden/app"));
     let x = nested.folders[0].id;
-    let itself = default_path(pf, &[nested], pid, "Garden", x, "x", true).unwrap();
+    let itself = default_path(pf, &[nested], pid, "Garden", x, "x", true, None).unwrap();
     assert_eq!(itself, Path::new("/dev/Garden/x"));
 }
 
@@ -71,7 +72,14 @@ fn default_path_avoids_other_projects_folders() {
 fn adopt_creates_and_never_moves_a_path() {
     let incoming = project(vec![folder("app", None), folder("docs", None)]);
     let mut all = vec![project(vec![folder("app", Some("/dev/app"))])];
-    adopt(&mut all, &incoming, Path::new("/dev"), &HashMap::new()).unwrap();
+    adopt(
+        &mut all,
+        &incoming,
+        Path::new("/dev"),
+        &HashMap::new(),
+        &HashMap::new(),
+    )
+    .unwrap();
     assert_eq!(all[1].folders[0].local_path, Some("/dev/Garden/app".into()));
     assert_eq!(all[1].primary, incoming.primary);
 
@@ -79,7 +87,14 @@ fn adopt_creates_and_never_moves_a_path() {
     all[1].folders[1].local_path = None;
     all[1].name = "Local name".into();
     let chosen = HashMap::from([(incoming.folders[1].id, PathBuf::from("/picked"))]);
-    adopt(&mut all, &incoming, Path::new("/dev"), &chosen).unwrap();
+    adopt(
+        &mut all,
+        &incoming,
+        Path::new("/dev"),
+        &chosen,
+        &HashMap::new(),
+    )
+    .unwrap();
     assert_eq!(all.len(), 2);
     assert_eq!(all[1].name, "Local name");
     assert_eq!(all[1].folders[0].local_path, Some("/mine".into()));
@@ -87,7 +102,14 @@ fn adopt_creates_and_never_moves_a_path() {
 
     // A single-folder project whose default is taken gets a free name.
     let lone = project(vec![folder("app", None)]);
-    adopt(&mut all, &lone, Path::new("/dev"), &HashMap::new()).unwrap();
+    adopt(
+        &mut all,
+        &lone,
+        Path::new("/dev"),
+        &HashMap::new(),
+        &HashMap::new(),
+    )
+    .unwrap();
     assert_eq!(all[2].folders[0].local_path, Some("/dev/app 2".into()));
 }
 
@@ -132,6 +154,53 @@ fn names_are_checked_for_the_receiving_system() {
 #[test]
 fn a_project_with_several_folders_lands_in_a_folder_named_after_it() {
     let (pid, id) = (uuid::Uuid::new_v4(), uuid::Uuid::new_v4());
-    let d = default_path(Path::new("/dev"), &[], pid, "What Next?", id, "app", true).unwrap();
+    let d = default_path(
+        Path::new("/dev"),
+        &[],
+        pid,
+        "What Next?",
+        id,
+        "app",
+        true,
+        None,
+    )
+    .unwrap();
     assert_eq!(d, Path::new("/dev/What Next/app"));
+}
+
+#[test]
+fn default_path_takes_a_free_hint_and_falls_back_otherwise() {
+    let pf = Path::new("/u/Dev");
+    let (pid, id) = (Uuid::new_v4(), Uuid::new_v4());
+    let hint = Path::new("/u/.ms/secrets/abc");
+    let d = |all: &[Project], h: &Path| {
+        default_path(pf, all, pid, "Shop", id, "abc", false, Some(h)).unwrap()
+    };
+    assert_eq!(d(&[], hint), hint);
+    // Taken by, inside or around another project's folder: the usual default.
+    for taken in ["/u/.ms/secrets/abc", "/u/.ms", "/u/.ms/secrets/abc/inner"] {
+        let other = project(vec![folder("x", Some(taken))]);
+        assert_eq!(d(&[other], hint), Path::new("/u/Dev/abc"), "{taken}");
+    }
+    // Never the Projects folder or anything holding it, nor a disk top.
+    for h in ["/u/Dev", "/u", "/"] {
+        assert_eq!(d(&[], Path::new(h)), Path::new("/u/Dev/abc"), "{h}");
+    }
+}
+
+#[test]
+fn adopt_lands_a_new_folder_at_its_hint() {
+    let mut all = Vec::new();
+    let incoming = project(vec![folder("abc", None)]);
+    let hints = HashMap::from([(incoming.folders[0].id, PathBuf::from("/u/.ms/abc"))]);
+    adopt(
+        &mut all,
+        &incoming,
+        Path::new("/u/Dev"),
+        &HashMap::new(),
+        &hints,
+    )
+    .unwrap();
+    let path = all[0].folders[0].local_path.as_deref();
+    assert_eq!(path, Some(Path::new("/u/.ms/abc")));
 }

@@ -5,6 +5,7 @@
 use super::Shared;
 use crate::model::{InstanceId, Permissions, ProjectId};
 use crate::protocol::{ProjectSummary, Reachable, RemoteFolder, RemoteProject, Response};
+use crate::transfer::home::{home_hint, shown};
 
 /// `reachable` leaves out the caller: it asked to reach the others.
 pub(super) async fn status(shared: &Shared, allows: Permissions, caller: InstanceId) -> Response {
@@ -38,6 +39,8 @@ pub(super) async fn status(shared: &Shared, allows: Permissions, caller: Instanc
 }
 
 pub(super) async fn project_info(shared: &Shared, project: ProjectId) -> Response {
+    let pf = shared.settings.read().await.projects_folder.clone();
+    let home = shared.home.as_deref();
     let projects = shared.projects.read().await;
     let info = projects
         .iter()
@@ -53,6 +56,11 @@ pub(super) async fn project_info(shared: &Shared, project: ProjectId) -> Respons
                     id: f.id,
                     name: f.name.clone(),
                     path: f.local_path.as_ref().map(|l| l.display().to_string()),
+                    home_hint: f
+                        .local_path
+                        .as_deref()
+                        .and_then(|l| home_hint(l, &pf, home?)),
+                    shown: f.local_path.as_deref().map(|l| shown(l, home)),
                 })
                 .collect(),
         });

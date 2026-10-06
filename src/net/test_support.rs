@@ -38,6 +38,7 @@ pub(super) fn shared(
         identity: Arc::new(identity),
         events: tx,
         found: Default::default(),
+        home: None,
     };
     (s, rx)
 }

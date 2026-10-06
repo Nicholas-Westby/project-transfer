@@ -75,6 +75,10 @@ pub enum Request {
         /// system expects. Missing from older versions, which get names as stored.
         #[serde(default)]
         from_os: Option<Os>,
+        /// The folder's place under the asker's home (see `transfer::home`),
+        /// which a computer without a path for it uses when it is free.
+        #[serde(default)]
+        home_hint: Option<String>,
     },
     /// Hashes of files in the folder the same connection last scanned, or the
     /// responder's own folder.
@@ -96,6 +100,9 @@ pub enum Request {
         project: Project,
         folder: FolderId,
         expected_path: String,
+        /// As `Manifest::home_hint`, for each folder that has one.
+        #[serde(default)]
+        home_hints: HashMap<FolderId, String>,
     },
     /// Followed by `size` raw bytes.
     PutFile {
@@ -131,6 +138,21 @@ pub enum Request {
         project: ProjectId,
         commands: Vec<Command>,
     },
+    /// The project's details without any files, as in `BeginPush`: the
+    /// receiver takes in its folders, description and commands and answers
+    /// `ProjectInfo` with what it has now.
+    SyncProject {
+        project: Project,
+        #[serde(default)]
+        home_hints: HashMap<FolderId, String>,
+    },
+    /// Where the receiver keeps one folder of a project, as typed; a
+    /// leading `~` is the receiver's home. Nothing on disk changes.
+    SetFolderPath {
+        project: ProjectId,
+        folder: FolderId,
+        path: String,
+    },
 }
 
 impl Request {
@@ -156,6 +178,8 @@ impl Request {
             Request::EndPush => "EndPush",
             Request::EndPull { .. } => "EndPull",
             Request::ExchangeCommands { .. } => "ExchangeCommands",
+            Request::SyncProject { .. } => "SyncProject",
+            Request::SetFolderPath { .. } => "SetFolderPath",
         }
     }
 }
@@ -241,6 +265,12 @@ pub struct RemoteFolder {
     pub name: String,
     /// For display only; never used to resolve a path.
     pub path: Option<String>,
+    /// As `Request::Manifest::home_hint`, from the answering computer.
+    #[serde(default)]
+    pub home_hint: Option<String>,
+    /// `path` with `~` for the answering computer's home, for display.
+    #[serde(default)]
+    pub shown: Option<String>,
 }
 
 /// u32 big-endian length, then JSON.

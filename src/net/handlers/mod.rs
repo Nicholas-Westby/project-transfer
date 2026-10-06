@@ -7,6 +7,7 @@ use crate::ignore_rules::Matcher;
 use crate::manifest::{compose_for, hash_file, scan};
 use crate::model::{FolderId, Os, Peer, ProjectId};
 use crate::protocol::{FolderScan, Request, Response, write_msg};
+use crate::transfer::home::resolve;
 use crate::transfer::projects::{default_path, exchange_commands, wire_commands};
 use crate::transfer::safe_join;
 use std::collections::HashMap;
@@ -15,6 +16,7 @@ use std::path::PathBuf;
 use tokio::io::{AsyncRead, AsyncWrite};
 use tracing::info;
 
+mod details;
 mod pull;
 mod push;
 
@@ -51,11 +53,13 @@ pub async fn handle<S: AsyncRead + AsyncWrite + Unpin + Send>(
             project_name,
             multi_folder,
             from_os,
+            home_hint,
         } => {
             let names = Names {
                 project: &project_name,
                 folder: &folder_name,
                 multi: multi_folder,
+                hint: home_hint.as_deref(),
             };
             manifest(ctx, state, project, folder, names, ignore, from_os).await
         }
@@ -76,6 +80,15 @@ pub async fn handle<S: AsyncRead + AsyncWrite + Unpin + Send>(
             rel,
         } => return pull::get_file(ctx, stream, project, folder, &rel).await,
         Request::EndPull { project, files } => pull::end_pull(ctx, project, files).await,
+        Request::SyncProject {
+            project,
+            home_hints,
+        } => details::sync(ctx, project, home_hints).await,
+        Request::SetFolderPath {
+            project,
+            folder,
+            path,
+        } => details::set_path(ctx, project, folder, &path).await,
         Request::PutFile {
             rel,
             size,
@@ -124,6 +137,7 @@ struct Names<'a> {
     project: &'a str,
     folder: &'a str,
     multi: bool,
+    hint: Option<&'a str>,
 }
 
 async fn manifest(
@@ -141,7 +155,20 @@ async fn manifest(
             let pf = ctx.shared.settings.read().await.projects_folder.clone();
             let projects = ctx.shared.projects.read().await;
             let (pn, fname) = (names.project, names.folder);
-            match default_path(&pf, &projects, project, pn, folder, fname, names.multi) {
+            let hint = names
+                .hint
+                .and_then(|h| resolve(ctx.shared.home.as_deref(), h));
+            let hint = hint.as_deref();
+            match default_path(
+                &pf,
+                &projects,
+                project,
+                pn,
+                folder,
+                fname,
+                names.multi,
+                hint,
+            ) {
                 Ok(p) => (p, false),
                 Err(reason) => return refused(reason),
             }

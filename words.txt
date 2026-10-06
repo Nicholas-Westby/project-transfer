@@ -97,6 +97,8 @@
 21e-hover-icon
 22-description-editing
 22b-description-narrow
+23-folder-menu
+23b-change-folder-on-peer
 255-byte
 2f7a
 2x
@@ -179,6 +181,7 @@ agree
 agreeing
 agrees
 ahead
+aimed
 algorithms
 algs
 alias
@@ -240,6 +243,7 @@ apostrophe
 apostrophes
 app
 app's
+app2
 appdata
 appear
 appearance
@@ -283,6 +287,7 @@ aside2
 ask
 asked
 asker
+asker's
 asking
 asks
 assert
@@ -359,6 +364,7 @@ been
 before
 began
 begin
+begins
 behind
 being
 belong
@@ -420,6 +426,7 @@ brave
 break
 breaks
 bridge
+brings
 brisk
 broad
 broken-pipe
@@ -716,6 +723,7 @@ corrupt
 cost
 costs
 could
+couldn't
 count
 counted
 counterpart
@@ -742,6 +750,7 @@ crypto
 cst
 csv
 ctx
+cur
 current
 cursor
 custom
@@ -1018,6 +1027,7 @@ escaped
 escapes
 estimate
 estimates
+etc
 euclid
 ev
 even
@@ -1051,6 +1061,7 @@ exists
 exit
 exited
 exits
+expand
 expand2
 expansion
 expect
@@ -1342,6 +1353,7 @@ height
 heirloom
 held
 hello
+help
 helper
 helpers
 herbs
@@ -1356,6 +1368,7 @@ hides
 hiding
 high
 hint
+hinted
 hints
 history
 hoc
@@ -1365,6 +1378,7 @@ holders
 holding
 holds
 home
+home-root
 hook
 hooks
 horizontal
@@ -1564,6 +1578,7 @@ lan
 lanczos3
 land
 landed
+landing
 lands
 laptop
 laptop's
@@ -1738,6 +1753,7 @@ meanwhile
 measure
 measured
 media
+meg
 mellow
 mem
 member
@@ -1890,6 +1906,7 @@ noninteractive
 noop
 nope
 nor
+normal
 normalization
 normalize
 normalizing
@@ -1991,6 +2008,7 @@ outstanding
 over
 overflow
 overflows
+overlap
 overlaps
 overridden
 oversize
@@ -2217,6 +2235,7 @@ ps
 ps1
 pt-a
 pt-b
+pt-home
 pt-install
 pt-tmp
 ptr
@@ -2615,6 +2634,7 @@ seq
 serde
 serialize
 serious
+sersecrets
 serve
 server
 serves
@@ -2649,6 +2669,7 @@ sheet
 sheet's
 sheets
 shell
+shop
 short
 shortcut
 shot
@@ -2662,6 +2683,7 @@ shrank
 shrink
 shrinks
 shutdown
+sibling
 siblings
 side
 sides
@@ -2707,6 +2729,7 @@ slot
 slow
 sm
 small
+smaller
 smallest
 snake
 snapshot
@@ -2876,10 +2899,13 @@ symlink
 symlinks
 symmetric
 sync
+synced
+syncing
 syncs
 syncthing
 sys
 system
+system's
 system-configuration-sys
 systems
 t
@@ -2938,6 +2964,7 @@ texts
 textures
 than
 that
+that's
 the
 their
 theirs
@@ -2969,6 +2996,7 @@ tide-tables
 tidy
 tie
 tiger
+tilde
 time
 time-only
 timed
@@ -3137,6 +3165,7 @@ used
 user
 user's
 users
+usersecrets
 uses
 using
 usize
@@ -3233,6 +3262,7 @@ whatever
 when
 whenever
 where
+wherever
 whether
 which
 whichever

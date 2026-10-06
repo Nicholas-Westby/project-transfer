@@ -42,6 +42,8 @@ fn info(p: &Project) -> RemoteProject {
                 id: f.id,
                 name: f.name.clone(),
                 path: Some(format!("C:\\dev\\{}", f.name)),
+                home_hint: None,
+                shown: None,
             })
             .collect(),
     }

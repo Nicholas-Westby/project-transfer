@@ -48,6 +48,9 @@ pub struct Shared {
     /// through a relay, or this computer would offer to pass connections to
     /// one it can't reach itself.
     pub found: Arc<RwLock<HashMap<InstanceId, Vec<SocketAddr>>>>,
+    /// This user's home folder, where folders from another computer's home
+    /// land (see `transfer::home`). Tests give each instance its own.
+    pub home: Option<std::path::PathBuf>,
 }
 
 #[derive(Debug)]
@@ -82,6 +85,9 @@ pub enum NetEvent {
         failed: u64,
     },
     Log(String),
+    /// A paired computer changed this computer's projects; the text says
+    /// what, for the activity strip.
+    ProjectsChanged(String),
 }
 
 /// Adds or replaces the peer by id, saving before the in-memory list changes

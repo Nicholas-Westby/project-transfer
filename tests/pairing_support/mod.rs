@@ -62,6 +62,7 @@ async fn start(answer: Option<Option<Permissions>>) -> Instance {
         identity: Arc::new(identity),
         events: tx,
         found: Default::default(),
+        home: None,
     };
     let codes = Arc::new(Mutex::new(Vec::new()));
     let refusals = Arc::new(Mutex::new(Vec::new()));
@@ -138,6 +139,7 @@ pub fn manifest_req() -> Request {
         project_name: "Garden".into(),
         multi_folder: false,
         from_os: None,
+        home_hint: None,
     }
 }
 

@@ -57,10 +57,11 @@ impl<C> Slot<C> {
     }
 }
 
-const BUSY: &str = "A transfer is already under way. Wait for it to finish or cancel it.";
+pub(super) const BUSY: &str =
+    "A transfer is already under way. Wait for it to finish or cancel it.";
 
 impl Core {
-    fn busy(&self) -> bool {
+    pub(super) fn busy(&self) -> bool {
         matches!(
             self.ui.lock().transfer,
             TransferState::Preparing | TransferState::Running { .. }

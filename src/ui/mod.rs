@@ -10,6 +10,7 @@ pub mod description;
 pub mod dialogs;
 mod folders;
 mod pairing;
+mod peer_folder;
 mod picker;
 mod preview;
 mod preview_view;
@@ -75,6 +76,7 @@ pub enum Sheet {
         label: String,
         line: String,
     },
+    PeerFolder(peer_folder::PeerFolderDraft),
 }
 
 /// What only the window remembers: selection, open sheets, drafts.
@@ -213,6 +215,7 @@ impl App {
                 label,
                 line,
             } => self.command_editor(ui, project, id, label, line),
+            Sheet::PeerFolder(draft) => self.peer_folder_sheet(ui, s, draft),
         }
     }
 

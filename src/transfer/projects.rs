@@ -56,8 +56,12 @@ const MAX_SUFFIX: u32 = 100;
 ///
 /// The part directly under the Projects folder gets a " 2", " 3"... suffix
 /// while the path equals, contains or lies inside another project's folder,
-/// so a new folder never mirrors over someone else's files. Every side uses
-/// this one function, so the preview shows the path the transfer uses.
+/// so a new folder never mirrors over someone else's files. `hint`, the
+/// same place under home as on the other computer (see `home`), wins when
+/// it is free by those rules and holds neither a disk top nor the Projects
+/// folder. Every side uses this one function, so the preview shows the path
+/// the transfer uses.
+#[allow(clippy::too_many_arguments)] // One call per side; each must match.
 pub fn default_path(
     projects_folder: &Path,
     all: &[Project],
@@ -66,6 +70,7 @@ pub fn default_path(
     folder: FolderId,
     folder_name: &str,
     incoming_multi: bool,
+    hint: Option<&Path>,
 ) -> Result<PathBuf, String> {
     let local = all.iter().find(|p| p.id == project);
     let project_name = local.map_or(incoming_name, |p| p.name.as_str());
@@ -95,6 +100,18 @@ pub fn default_path(
                 .filter_map(move |f| Some((p.name.as_str(), f.local_path.as_deref()?)))
         })
         .collect();
+    let free = |path: &Path| {
+        !taken
+            .iter()
+            .any(|(_, t)| path.starts_with(t) || t.starts_with(path))
+    };
+    if let Some(h) = hint
+        && h.parent().is_some()
+        && !projects_folder.starts_with(h)
+        && free(h)
+    {
+        return Ok(h.to_path_buf());
+    }
     if let Some((name, path)) = taken.iter().find(|(_, t)| projects_folder.starts_with(t)) {
         return Err(format!(
             "The Projects folder {} is inside {}, a folder of project `{name}`. Choose another \
@@ -111,10 +128,7 @@ pub fn default_path(
         if let Some(r) = rest {
             path.push(r);
         }
-        if !taken
-            .iter()
-            .any(|(_, t)| path.starts_with(t) || t.starts_with(&path))
-        {
+        if free(&path) {
             return Ok(path);
         }
     }
@@ -127,12 +141,14 @@ pub fn default_path(
 
 /// Takes in `incoming` from the other computer: creates it if unknown, adds
 /// folders it lacks, and gives each folder without a path `chosen[id]` or the
-/// default. Never changes an existing path or a local name.
+/// default, hinted by `hints[id]`. Never changes an existing path or a local
+/// name.
 pub fn adopt(
     projects: &mut Vec<Project>,
     incoming: &Project,
     projects_folder: &Path,
     chosen: &HashMap<FolderId, PathBuf>,
+    hints: &HashMap<FolderId, PathBuf>,
 ) -> Result<(), String> {
     let multi = incoming.folders.len() > 1;
     let local = projects.iter().find(|p| p.id == incoming.id).cloned();
@@ -168,6 +184,7 @@ pub fn adopt(
                 f.id,
                 &f.name,
                 multi,
+                hints.get(&f.id).map(PathBuf::as_path),
             )?,
         };
         f.local_path = Some(path);

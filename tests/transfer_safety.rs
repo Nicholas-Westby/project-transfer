@@ -23,6 +23,7 @@ async fn dropped_connection_mid_file_keeps_the_old_file_and_no_temp() {
         project: a.project(p.id).await.unwrap(),
         folder: p.primary,
         expected_path: b.dev().join("app").display().to_string(),
+        home_hints: Default::default(),
     };
     assert_eq!(conn.request(&begin).await.unwrap(), Response::Ok);
     let put = Request::PutFile {
@@ -87,6 +88,7 @@ async fn paths_leaving_the_folder_are_refused() {
         project: a.project(p.id).await.unwrap(),
         folder: p.primary,
         expected_path: b.dev().join("app").display().to_string(),
+        home_hints: Default::default(),
     };
     assert_eq!(conn.request(&begin).await.unwrap(), Response::Ok);
     let bad = [
@@ -157,6 +159,7 @@ async fn a_pushed_symlink_cannot_be_used_to_write_outside() {
         project: a.project(p.id).await.unwrap(),
         folder: p.primary,
         expected_path: b.dev().join("app").display().to_string(),
+        home_hints: Default::default(),
     };
     assert_eq!(conn.request(&begin).await.unwrap(), Response::Ok);
     let link = Request::MakeSymlink {
