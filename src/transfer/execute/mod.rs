@@ -52,11 +52,12 @@ pub async fn execute(
         here: String::new(),
         in_flight: Default::default(),
     };
-    match run.all(shared, &preview).await {
+    let result = run.all(shared, &preview).await;
+    let mut s = run.summary;
+    s.took_ms = started.elapsed().as_millis() as u64;
+    log_done(run.direction, run.conn.peer_name(), &s, result.is_err());
+    match result {
         Ok(()) => {
-            let mut s = run.summary;
-            s.took_ms = started.elapsed().as_millis() as u64;
-            log_done(run.direction, run.conn.peer_name(), &s);
             let _ = progress.send(Progress::Done(s.clone()));
             Ok(s)
         }
