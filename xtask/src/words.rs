@@ -1,6 +1,7 @@
 //! Splits text into the words listed in `words.txt`. A word is letters and
 //! digits with at least one letter (`player1`, `blake3`, `4b96`), joined by
-//! single hyphens (`one-time`). Everything is lowercased so `Result` and
+//! single hyphens (`one-time`). Capitals inside a word don't split it, so
+//! `GardenPlanner` is one word. Everything is lowercased so `Result` and
 //! `result` are one entry. Hashes, keys and other random-looking strings are
 //! kept on purpose: spotting a committed secret is one reason for the list.
 
@@ -122,65 +123,13 @@ fn split_apostrophes(part: &str) -> Vec<String> {
     out
 }
 
-/// The words to list from one piece; none for plain numbers.
-fn clean(piece: &str) -> Vec<String> {
+/// The word to list from one piece; none for plain numbers.
+fn clean(piece: &str) -> Option<String> {
     let piece = piece.replace('\u{2019}', "'");
-    split_camel_case(&piece)
-        .into_iter()
-        .filter(|w| w.chars().any(char::is_alphabetic))
-        .map(|w| w.to_lowercase())
-        .collect()
-}
-
-/// `ClientCertVerifier` gives `Client`, `Cert` and `Verifier`, and
-/// `TLSConfig` gives `TLS` and `Config`, so a misspelt part stands out
-/// instead of hiding in one long word. Digits stay with the letters before
-/// them (`Color32`). A piece with no capitals inside comes back whole.
-fn split_camel_case(piece: &str) -> Vec<String> {
-    let chars: Vec<char> = piece.chars().collect();
-    let starts_word = |i: usize| {
-        let (prev, c) = (chars[i - 1], chars[i]);
-        let next_lower = chars.get(i + 1).is_some_and(|n| n.is_lowercase());
-        c.is_uppercase()
-            && (prev.is_lowercase() || prev.is_ascii_digit() || (prev.is_uppercase() && next_lower))
-    };
-    if !(1..chars.len()).any(starts_word) {
-        return vec![piece.to_string()];
-    }
-    let mut words = vec![String::new()];
-    for (i, &c) in chars.iter().enumerate() {
-        if c == '-' || (i > 0 && starts_word(i)) {
-            words.push(String::new());
-        }
-        if c != '-' {
-            words.last_mut().expect("words is never empty").push(c);
-        }
-    }
-    words.retain(|w| !w.is_empty());
-    if looks_random(&words) {
-        return vec![piece.to_string()];
-    }
-    words
-}
-
-/// A key such as `aB3xQ9zK` splits into scraps (`B3x`, `K`) that would hide
-/// it among real words, so it stays whole. Real identifiers split into parts
-/// of letters with at most trailing digits, and most have three letters or more.
-fn looks_random(parts: &[String]) -> bool {
-    let odd_digits = parts.iter().any(|p| {
-        let letters_end = p.trim_end_matches(|c: char| c.is_ascii_digit());
-        letters_end.chars().any(|c| c.is_ascii_digit())
-    });
-    let short = parts
-        .iter()
-        .filter(|p| {
-            p.trim_end_matches(|c: char| c.is_ascii_digit())
-                .chars()
-                .count()
-                <= 2
-        })
-        .count();
-    odd_digits || short * 2 > parts.len()
+    piece
+        .chars()
+        .any(char::is_alphabetic)
+        .then(|| piece.to_lowercase())
 }
 
 #[cfg(test)]
@@ -259,17 +208,14 @@ mod tests {
     }
 
     #[test]
-    fn splits_camel_case() {
+    fn keeps_mixed_case_words_whole() {
         assert_eq!(
-            list("ClientCertVerifier TLSConfig Color32Image Vec2 macOS"),
-            [
-                "cert", "client", "color32", "config", "image", "mac", "os", "tls", "vec2",
-                "verifier"
-            ]
+            list("ClientCertVerifier TLSConfig Color32Image macOS"),
+            ["clientcertverifier", "color32image", "macos", "tlsconfig"]
         );
         assert_eq!(
             list("Jane's one-time GardenPlanner-web"),
-            ["garden", "jane's", "one-time", "planner", "web"]
+            ["gardenplanner-web", "jane's", "one-time"]
         );
     }
 
