@@ -71,6 +71,10 @@ pub enum Request {
         /// Whether the initiator's project has more than one folder, which
         /// decides the default path on a computer that has not set it up.
         multi_folder: bool,
+        /// The asking computer's system, so a Mac answers with the spelling that
+        /// system expects. Missing from older versions, which get names as stored.
+        #[serde(default)]
+        from_os: Option<Os>,
     },
     /// Hashes of files in the folder the same connection last scanned, or the
     /// responder's own folder.

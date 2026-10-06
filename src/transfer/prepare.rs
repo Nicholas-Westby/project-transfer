@@ -6,7 +6,7 @@ use super::preview::{
 use super::projects::{check_names_for, default_path};
 use super::{link, safe_join};
 use crate::ignore_rules::{IgnoreSpec, Matcher};
-use crate::manifest::{Manifest, compare, hash_file, resolve_hashes, scan};
+use crate::manifest::{Manifest, compare, compose_for, hash_file, resolve_hashes, scan};
 use crate::model::{Direction, FolderId, Os, Project, ProjectId};
 use crate::net::{Connection, Shared};
 use crate::protocol::{FolderScan, ProjectSummary, Request, Response};
@@ -125,7 +125,7 @@ pub async fn prepare(
                 if !remote.set_up && remote.exists && !remote.manifest.entries.is_empty() {
                     ctx.warnings.push(unclaimed(&remote.path, &peer));
                 }
-                let mine = ctx.local_scan(root.clone()).await?;
+                let mine = ctx.local_scan(root.clone(), compose_for(remote.os)).await?;
                 let side = Sides {
                     folder: f.id,
                     name: f.name.clone(),
@@ -188,7 +188,7 @@ pub async fn prepare(
                         }
                     },
                 };
-                let mine = ctx.local_scan(dest.clone()).await?;
+                let mine = ctx.local_scan(dest.clone(), compose_for(remote.os)).await?;
                 let set_up = known.is_some_and(|f| f.local_path.is_some());
                 if !set_up && dest.is_dir() && !mine.entries.is_empty() {
                     ctx.warnings
@@ -261,6 +261,7 @@ impl Ctx<'_> {
             folder_name: folder_name.into(),
             project_name: project_name.into(),
             multi_folder,
+            from_os: Some(Os::current()),
         };
         match self.conn.request(&req).await? {
             Response::Manifest(s) => Ok(s),
@@ -268,10 +269,10 @@ impl Ctx<'_> {
         }
     }
 
-    async fn local_scan(&self, root: PathBuf) -> anyhow::Result<Manifest> {
+    async fn local_scan(&self, root: PathBuf, compose: bool) -> anyhow::Result<Manifest> {
         let spec = self.spec.clone();
         let shown = root.display().to_string();
-        tokio::task::spawn_blocking(move || scan(&root, &Matcher::new(&spec)?))
+        tokio::task::spawn_blocking(move || scan(&root, &Matcher::new(&spec)?, compose))
             .await?
             .with_context(|| format!("Could not read {shown}"))
     }

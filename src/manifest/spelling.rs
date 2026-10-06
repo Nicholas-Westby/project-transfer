@@ -2,14 +2,27 @@
 //! composed or the decomposed spelling of letters like "ú", and tools and
 //! older disks often leave the decomposed one; Windows disks and most
 //! databases use the composed one and tell the two apart. So a Mac sends
-//! the composed spelling (as Git, Syncthing and Dropbox do), and only when
-//! it reaches the very same file.
+//! the composed spelling (as Git, Syncthing and Dropbox do) to a computer
+//! that is not a Mac, and only when it reaches the very same file.
 
+use crate::model::Os;
 use std::path::Path;
+
+/// Whether a scan for `peer` lists names composed: only on a Mac, and only for
+/// a computer that is not a Mac. A Mac's disk opens a file by either spelling,
+/// while Windows keeps them apart and expects the composed one. Another Mac
+/// lists names as stored, so the two lists would differ, and an older one
+/// would then delete a file it just received under the other spelling.
+pub fn compose_for(peer: Os) -> bool {
+    cfg!(target_os = "macos") && peer != Os::MacOs
+}
 
 #[cfg(target_os = "macos")]
 pub(super) fn composed(dir: &Path, name: String, meta: &std::fs::Metadata) -> String {
     use std::os::unix::fs::MetadataExt;
+    if name.is_ascii() {
+        return name;
+    }
     let nfc = nfc(&name);
     if nfc == name {
         return name;
@@ -153,5 +166,18 @@ mod tests {
             composed(elsewhere.path(), "soldu\u{301}.jpg".into(), &meta),
             "soldu\u{301}.jpg"
         );
+    }
+}
+
+/// Runs on every system, so one that is not a Mac shows it never composes.
+#[cfg(test)]
+mod peer_tests {
+    use super::compose_for;
+    use crate::model::Os;
+
+    #[test]
+    fn only_a_mac_composes_and_only_for_a_computer_that_is_not_a_mac() {
+        assert_eq!(compose_for(Os::Windows), cfg!(target_os = "macos"));
+        assert!(!compose_for(Os::MacOs));
     }
 }

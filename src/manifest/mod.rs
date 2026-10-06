@@ -39,3 +39,4 @@ mod spelling;
 pub use compare::{Change, Plan, compare, resolve_hashes};
 pub use scan::{hash_file, scan};
 pub(crate) use scan::{is_exec, mtime_ms};
+pub use spelling::compose_for;

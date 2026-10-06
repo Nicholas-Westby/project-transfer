@@ -4,7 +4,7 @@
 
 use super::Shared;
 use crate::ignore_rules::Matcher;
-use crate::manifest::{hash_file, scan};
+use crate::manifest::{compose_for, hash_file, scan};
 use crate::model::{FolderId, Os, Peer, ProjectId};
 use crate::protocol::{FolderScan, Request, Response, write_msg};
 use crate::transfer::projects::{default_path, exchange_commands, wire_commands};
@@ -50,13 +50,14 @@ pub async fn handle<S: AsyncRead + AsyncWrite + Unpin + Send>(
             folder_name,
             project_name,
             multi_folder,
+            from_os,
         } => {
             let names = Names {
                 project: &project_name,
                 folder: &folder_name,
                 multi: multi_folder,
             };
-            manifest(ctx, state, project, folder, names, ignore).await
+            manifest(ctx, state, project, folder, names, ignore, from_os).await
         }
         Request::Hashes {
             project,
@@ -132,6 +133,7 @@ async fn manifest(
     folder: FolderId,
     names: Names<'_>,
     ignore: crate::ignore_rules::IgnoreSpec,
+    from_os: Option<Os>,
 ) -> Response {
     let (root, set_up) = match stored_root(ctx.shared, project, folder).await {
         Some(p) => (p, true),
@@ -150,7 +152,8 @@ async fn manifest(
         Err(e) => return refused(format!("The ignore list is not valid: {e:#}")),
     };
     let scan_root = root.clone();
-    let scanned = tokio::task::spawn_blocking(move || scan(&scan_root, &matcher)).await;
+    let compose = from_os.is_some_and(compose_for);
+    let scanned = tokio::task::spawn_blocking(move || scan(&scan_root, &matcher, compose)).await;
     let manifest = match scanned {
         Ok(Ok(m)) => m,
         Ok(Err(e)) => return refused(format!("Could not read {}: {e:#}", root.display())),

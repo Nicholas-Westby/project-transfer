@@ -137,6 +137,7 @@ pub fn manifest_req() -> Request {
         folder_name: "app".into(),
         project_name: "Garden".into(),
         multi_folder: false,
+        from_os: None,
     }
 }
 
