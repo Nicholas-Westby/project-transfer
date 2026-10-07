@@ -59,6 +59,34 @@ pub fn all(dir: &Path) {
         s.transfer = TransferState::Ready(p);
     });
     shot(dir, "04c-preview-description-only", f, none);
+    shot(
+        dir,
+        "04d-preview-ignore-hover",
+        with_drawings(ThemeChoice::Dark),
+        |h| {
+            h.get_by_label_contains("exports/2026/plot-01.svg").hover();
+        },
+    );
+    for (name, theme) in [
+        ("04e-ignore-dialog", ThemeChoice::Dark),
+        ("04f-ignore-dialog-light", ThemeChoice::Light),
+    ] {
+        shot(dir, name, with_drawings(theme), |h| {
+            h.get_by_label_contains("exports/2026/plot-01.svg").hover();
+            h.run_ok();
+            h.get_by_label("Ignore…").click();
+            h.run_ok();
+            h.get_by_label("Everything in exports").click();
+        });
+    }
+    shot(
+        dir,
+        "04g-ignore-dialog-blank",
+        with_drawings(ThemeChoice::Dark),
+        |h| {
+            h.get_by_label("Ignore files…").click();
+        },
+    );
     let f = FakeBackend::seeded();
     f.update(|s| {
         let p = sample_preview(s);
@@ -150,6 +178,13 @@ pub fn all(dir: &Path) {
         h.get_by_label("Settings").click_accesskit();
         h.run_ok();
         fixed_address(h);
+    });
+    let f = FakeBackend::seeded();
+    f.update(|s| s.me.extra_ignores = vec!["*.log".into(), "app/exports/".into()]);
+    shot(dir, "13b-settings-patterns", f, |h| {
+        h.get_by_label("Settings").click_accesskit();
+        fixed_address(h);
+        h.get_by_label("Add to always include").scroll_to_me();
     });
     shot(dir, "14-new-project", FakeBackend::seeded(), |h| {
         h.get_by_label("New project").click_accesskit();
@@ -248,4 +283,14 @@ pub fn all(dir: &Path) {
 fn fixed_address(h: &mut Harness<'static, App>) {
     h.run_ok();
     h.state_mut().view.my_addresses = Some(vec!["192.168.1.20:47820".into()]);
+}
+
+/// The sample preview with drawings to ignore, in `theme`.
+fn with_drawings(theme: ThemeChoice) -> Arc<FakeBackend> {
+    let f = FakeBackend::seeded();
+    f.update(|s| {
+        s.me.theme = theme;
+        super::with_drawings(s);
+    });
+    f
 }

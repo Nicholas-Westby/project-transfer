@@ -1,7 +1,7 @@
 //! This computer's own settings: name, Projects folder, theme, ignore list.
 
 use super::{Core, lock};
-use crate::ignore_rules::{IgnoreSpec, Matcher};
+use crate::ignore_rules::{DEFAULT_IGNORES, IgnoreSpec, Matcher, trim};
 use crate::model::{InstanceSettings, ThemeChoice};
 use anyhow::{Context, bail};
 use std::path::PathBuf;
@@ -69,9 +69,47 @@ impl Core {
         always_include: Vec<String>,
         removed_defaults: Vec<String>,
     ) -> anyhow::Result<()> {
+        self.save_ignores(extra, always_include, removed_defaults)
+            .await?;
+        self.ui
+            .info("Updated the ignore list. It applies from the next transfer.");
+        Ok(())
+    }
+
+    pub(super) async fn add_ignore(&self, pattern: String) -> anyhow::Result<()> {
+        let pattern = trim(&pattern).to_string();
+        if pattern.is_empty() {
+            bail!("Enter a pattern to ignore.");
+        }
+        let s = self.shared.settings.read().await.clone();
+        let (mut extra, mut removed) = (s.extra_ignores, s.removed_default_ignores);
+        let done = if removed.contains(&pattern) {
+            removed.retain(|r| *r != pattern);
+            format!("Turned {pattern} back on in the ignore list.")
+        } else if extra.contains(&pattern) || DEFAULT_IGNORES.contains(&pattern.as_str()) {
+            self.ui
+                .info(format!("{pattern} is already on the ignore list."));
+            return Ok(());
+        } else {
+            extra.push(pattern.clone());
+            format!("Added {pattern} to the ignore list.")
+        };
+        self.save_ignores(extra, s.always_include, removed).await?;
+        self.ui.info(done);
+        self.compare_again()
+    }
+
+    /// Checks the whole list before saving any of it, so a bad pattern
+    /// changes nothing.
+    async fn save_ignores(
+        &self,
+        extra: Vec<String>,
+        always_include: Vec<String>,
+        removed_defaults: Vec<String>,
+    ) -> anyhow::Result<()> {
         let clean = |v: Vec<String>| -> Vec<String> {
             v.into_iter()
-                .map(|p| p.trim().to_string())
+                .map(|p| trim(&p).to_string())
                 .filter(|p| !p.is_empty())
                 .collect()
         };
@@ -88,8 +126,6 @@ impl Core {
             s.removed_default_ignores = candidate.removed_default_ignores;
         })
         .await?;
-        self.ui
-            .info("Updated the ignore list. It applies from the next transfer.");
         Ok(())
     }
 

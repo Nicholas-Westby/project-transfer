@@ -106,7 +106,7 @@ fn the_preview_shows_counts_and_names_the_push() {
     h.get_by_label("2 changed");
     h.get_by_label("1 timestamp only");
     h.get_by_label("313 removed");
-    h.get_by_label_contains("Remove folder app/old-sketches (312 files, 280 of them ignored)");
+    h.get_by_label_contains("Remove folder old-sketches (312 files, 280 of them ignored)");
     h.get_by_label("Push 320 file changes to Desktop Swift Heron")
         .click();
     h.run();

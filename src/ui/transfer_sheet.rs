@@ -1,6 +1,7 @@
 //! The large sheet over the project view for a transfer: comparing, the
 //! preview, progress, and the result.
 
+use super::ignore_sheet::Draft;
 use super::theme::Palette;
 use super::widgets::{self, plural};
 use super::{App, dialogs, preview, preview_view, transfer_running};
@@ -15,6 +16,9 @@ const WIDTH: f32 = 680.0;
 
 impl App {
     pub(super) fn transfer_sheet(&mut self, ui: &mut Ui, s: &UiState) {
+        if !matches!(s.transfer, TransferState::Ready(_)) {
+            self.view.ignore = None;
+        }
         let req = self.view.last_request.clone();
         let peer = req
             .as_ref()
@@ -66,7 +70,12 @@ impl App {
                     dialogs::sheet_title(ui, &title);
                     ready(ui, p, &peer)
                 });
-                match (r.dismissed, r.inner) {
+                let (answer, picked) = r.inner;
+                if picked.is_some() {
+                    self.view.ignore = picked;
+                }
+                self.ignore_sheet(ui, s, p, &peer);
+                match (r.dismissed, answer) {
                     (true, _) | (_, Some(false)) => Some(Action::CancelTransfer),
                     (_, Some(true)) if p.is_empty() => Some(Action::DismissTransfer),
                     (_, Some(true)) => Some(Action::Execute),
@@ -120,7 +129,8 @@ impl App {
     }
 }
 
-fn ready(ui: &mut Ui, p: &Preview, peer: &str) -> Option<bool> {
+/// The preview, and the dialog to open when something was picked to ignore.
+fn ready(ui: &mut Ui, p: &Preview, peer: &str) -> (Option<bool>, Option<Draft>) {
     let pal = Palette::of(ui.ctx());
     if p.is_empty() {
         let what = match p.request.direction {
@@ -132,7 +142,7 @@ fn ready(ui: &mut Ui, p: &Preview, peer: &str) -> Option<bool> {
         for w in preview::warnings(p, peer) {
             ui.label(preview_view::ticks(&w, pal.changed));
         }
-        return done_row(ui).then_some(true);
+        return (done_row(ui).then_some(true), None);
     }
     let description = match p.request.direction {
         Direction::Push => format!("The description on {peer} is replaced with this one."),
@@ -150,14 +160,15 @@ fn ready(ui: &mut Ui, p: &Preview, peer: &str) -> Option<bool> {
             Direction::Push => format!("Push the description to {peer}"),
             Direction::Pull => format!("Pull the description from {peer}"),
         };
-        return dialogs::button_row(ui, &label, false, true);
+        return (dialogs::button_row(ui, &label, false, true), None);
     }
     if p.description {
         widgets::muted(ui, description);
     }
-    preview_view::show(ui, p, peer);
+    let picked = preview_view::show(ui, p, peer);
     let removes = p.counts().removed_files > 0;
-    dialogs::button_row(ui, &preview::confirm_label(p, peer), removes, true)
+    let label = preview::confirm_label(p, peer);
+    (dialogs::button_row(ui, &label, removes, true), picked)
 }
 
 fn finished(ui: &mut Ui, sum: &Summary, dir: Direction, peer: &str) {

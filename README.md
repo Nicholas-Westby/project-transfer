@@ -79,10 +79,30 @@ the app skips `node_modules`, `bin`, `obj`, `packages`, `dist`, `.build`,
 `target`, `.vs`, `.idea`, `__pycache__`, `.pytest_cache`, `.gradle`, `.next`,
 `.nuxt`, `.cache`, `.DS_Store` and `Thumbs.db`.
 
-In Settings you can add and remove patterns (gitignore style) and add
-**always include** patterns, which win over every ignore pattern. The list of
-the computer that starts a transfer applies to both sides, and changes apply
-to the next transfer.
+Patterns work like `.gitignore` lines. A path in a pattern starts inside
+each project folder, not with the folder's name, and puts `/` between
+names, even on Windows:
+
+| Pattern      | Leaves out                                                |
+| ------------ | --------------------------------------------------------- |
+| `*.log`      | every file ending in `.log`                               |
+| `exports/`   | every folder named `exports`, at any depth                |
+| `/notes.txt` | `notes.txt` at the top of each project folder             |
+| `/src/tmp/`  | the folder `src/tmp`, from the top of each project folder |
+
+The easiest way to add one is from a transfer's preview. Point at a file
+and choose **Ignore…**: the dialog offers patterns for it, from the file
+alone up to every file of its type, and lists the files of this transfer
+each one would leave out before you add it. **Ignore files…** opens the
+same dialog for a pattern you type. Adding a pattern compares the folders
+again, so the preview shows the difference straight away.
+
+In Settings you can untick defaults, add and remove patterns, and add
+**always include** patterns, which win over every ignore pattern except
+inside a folder that is left out. Settings points out a pattern that
+starts with a project folder's name and offers to drop it. The list of
+the computer that starts a transfer applies to both sides, and changes
+apply to the next transfer.
 
 ## Local network only
 

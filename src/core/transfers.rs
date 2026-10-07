@@ -21,6 +21,10 @@ use tokio_util::sync::CancellationToken;
 pub(super) struct Slot<C = Connection> {
     /// Bumped whenever the UI moves on, so late results are dropped.
     generation: u64,
+    /// The latest request as the user made it, for comparing again. A
+    /// matched project's preview names the other computer's id, which this
+    /// computer only takes on when the transfer runs.
+    asked: Option<TransferRequest>,
     ready: Option<(C, Preview)>,
     cancel: Option<CancellationToken>,
 }
@@ -29,6 +33,7 @@ impl<C> Default for Slot<C> {
     fn default() -> Slot<C> {
         Slot {
             generation: 0,
+            asked: None,
             ready: None,
             cancel: None,
         }
@@ -75,6 +80,7 @@ impl Core {
         let generation = {
             let mut slot = lock(&self.transfer);
             let g = slot.reset();
+            slot.asked = Some(req.clone());
             self.ui.update(|s| s.transfer = TransferState::Preparing);
             g
         };
@@ -108,6 +114,16 @@ impl Core {
             }
         });
         Ok(())
+    }
+
+    /// Builds the open preview again from the request behind it, so a
+    /// changed ignore list shows at once.
+    pub(super) fn compare_again(&self) -> anyhow::Result<()> {
+        if !matches!(self.ui.lock().transfer, TransferState::Ready(_)) {
+            return Ok(());
+        }
+        let asked = lock(&self.transfer).asked.clone();
+        asked.map_or(Ok(()), |req| self.prepare(req))
     }
 
     pub(super) fn execute(&self) -> anyhow::Result<()> {

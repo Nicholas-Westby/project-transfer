@@ -1,6 +1,7 @@
 //! Settings: this computer's name, the Projects folder, the theme, the
 //! ignore list and the log folder.
 
+use super::patterns::{self, pattern_list};
 use super::theme::Palette;
 use super::widgets::{self, display_path};
 use super::{App, Sheet, dialogs};
@@ -131,7 +132,9 @@ impl App {
         widgets::section(ui, "Ignore list");
         widgets::small_muted(
             ui,
-            "Ticked patterns are left out of transfers. Changes apply to the next transfer.",
+            "Files and folders that match a ticked or listed pattern are left out of the \
+             transfers this computer starts, on both computers. Changes apply to the next \
+             transfer.",
         );
         ui.add_space(4.0);
         Grid::new("defaults")
@@ -154,14 +157,26 @@ impl App {
                     }
                 }
             });
+        let folders: Vec<&str> = s
+            .projects
+            .iter()
+            .flat_map(|p| p.folders.iter().map(|f| f.name.as_str()))
+            .collect();
         ui.add_space(8.0);
         pattern_list(
             ui,
             "Your patterns",
             &mut d.extra,
             &mut d.new_pattern,
-            "*.log",
+            ("New pattern", "*.log"),
             "Add pattern",
+            &folders,
+        );
+        ui.add_space(4.0);
+        patterns::help(ui);
+        widgets::small_muted(
+            ui,
+            "You can also ignore files straight from a transfer's preview.",
         );
         ui.add_space(8.0);
         pattern_list(
@@ -169,10 +184,15 @@ impl App {
             "Always include",
             &mut d.always_include,
             &mut d.new_include,
-            ".env.example",
+            ("New always include pattern", ".env.example"),
             "Add to always include",
+            &folders,
         );
-        widgets::small_muted(ui, "Always include wins over every ignore pattern.");
+        widgets::small_muted(
+            ui,
+            "Always include wins over every ignore pattern, except inside a folder that is \
+             left out.",
+        );
 
         ui.add_space(16.0);
         widgets::section(ui, "Logs");
@@ -186,44 +206,6 @@ impl App {
             );
         });
     }
-}
-
-fn pattern_list(
-    ui: &mut Ui,
-    title: &str,
-    list: &mut Vec<String>,
-    draft: &mut String,
-    hint: &str,
-    add_label: &str,
-) {
-    let pal = Palette::of(ui.ctx());
-    widgets::muted(ui, title);
-    let mut remove = None;
-    for (i, pat) in list.iter().enumerate() {
-        ui.horizontal(|ui| {
-            ui.label(widgets::mono(pat).color(pal.ink));
-            if widgets::quiet(ui, "Remove", Some(pal.removed)).clicked() {
-                remove = Some(i);
-            }
-        });
-    }
-    if let Some(i) = remove {
-        list.remove(i);
-    }
-    ui.horizontal(|ui| {
-        let r = ui.add(
-            TextEdit::singleline(draft)
-                .hint_text(widgets::hint(hint).monospace())
-                .font(egui::TextStyle::Monospace)
-                .desired_width(220.0),
-        );
-        let enter = r.lost_focus() && ui.input(|i| i.key_pressed(egui::Key::Enter));
-        let ok = !draft.trim().is_empty() && !list.iter().any(|p| p == draft.trim());
-        if (ui.add_enabled(ok, egui::Button::new(add_label)).clicked() || enter && ok) && ok {
-            list.push(draft.trim().to_string());
-            draft.clear();
-        }
-    });
 }
 
 #[cfg(test)]

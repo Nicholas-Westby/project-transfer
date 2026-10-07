@@ -9,8 +9,12 @@ mod confirmations;
 pub mod description;
 pub mod dialogs;
 mod folders;
+mod ignore_effect;
+mod ignore_sheet;
+mod ignoring;
 mod pairing;
 mod path_cut;
+mod patterns;
 mod peer_folder;
 mod picker;
 mod preview;
@@ -106,6 +110,8 @@ pub struct View {
     pub prompt_allows: Option<(crate::model::InstanceId, Permissions)>,
     /// This computer's addresses, read when a sheet opens.
     pub my_addresses: Option<Vec<String>>,
+    /// The ignore dialog over the open preview.
+    pub ignore: Option<ignore_sheet::Draft>,
     applied_theme: Option<ThemeChoice>,
 }
 
