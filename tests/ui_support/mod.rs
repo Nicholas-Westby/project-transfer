@@ -10,8 +10,9 @@ pub use seed::{sample_preview, with_pair_prompt};
 
 use egui_kittest::Harness;
 use egui_kittest::kittest::Queryable;
-use project_transfer::core::{Action, AppCore, StartOptions, UiState};
+use project_transfer::core::{Action, AppCore, StartOptions, TransferState, UiState};
 use project_transfer::discovery::Discovered;
+use project_transfer::manifest::{Change, Entry, Kind};
 use project_transfer::protocol::PROTOCOL_VERSION;
 use project_transfer::store::Store;
 use project_transfer::ui::{App, Backend, FolderPicker};
@@ -75,6 +76,38 @@ pub fn live(dir: &Path) -> (Arc<AppCore>, Harness<'static, App>) {
 
 pub fn ui_harness(fake: Arc<FakeBackend>) -> Harness<'static, App> {
     harness(fake)
+}
+
+/// Opens the sample preview with three drawings changed in its first
+/// folder: two in the top `exports` folder and one deeper, so the ignore
+/// dialog has folders to offer.
+pub fn with_drawings(s: &mut UiState) {
+    let mut p = sample_preview(s);
+    for rel in [
+        "exports/2026/plot-01.svg",
+        "exports/2026/plot-02.svg",
+        "src/exports/beds.svg",
+    ] {
+        p.folders[0].plan.changes.push(changed(rel));
+    }
+    s.transfer = TransferState::Ready(p);
+}
+
+/// A file a preview rewrites.
+pub fn changed(rel: &str) -> Change {
+    let kind = Kind::File {
+        size: 2_400,
+        mtime_ms: 0,
+        exec: false,
+    };
+    let entry = Entry {
+        rel: rel.into(),
+        kind,
+    };
+    Change::Update {
+        entry,
+        dest_newer: false,
+    }
 }
 
 /// Adds a computer listed through Desktop Swift Heron, which Laptop Quiet

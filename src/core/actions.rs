@@ -16,6 +16,9 @@ pub enum Action {
         always_include: Vec<String>,
         removed_defaults: Vec<String>,
     },
+    /// Adds one pattern to the ignore list, or turns a default back on, and
+    /// compares an open preview again so it shows the difference.
+    AddIgnore(String),
     OpenLogFolder,
 
     SelectPeer(InstanceId),
@@ -95,6 +98,7 @@ impl Core {
                 self.set_ignores(extra, always_include, removed_defaults)
                     .await
             }
+            Action::AddIgnore(pattern) => self.add_ignore(pattern).await,
             Action::OpenLogFolder => self.open_log_folder(),
 
             Action::SelectPeer(id) => self.select_peer(id).await,

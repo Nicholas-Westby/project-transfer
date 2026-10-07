@@ -10,6 +10,10 @@
 04-preview
 04b-preview-light
 04c-preview-description-only
+04d-preview-ignore-hover
+04e-ignore-dialog
+04f-ignore-dialog-light
+04g-ignore-dialog-blank
 05-running
 06-finished
 07-confirm-delete
@@ -73,6 +77,7 @@
 127ca604-f3cd-4b96-b52e-71c8d06fabe3
 12b-pair-prompt-waiting
 13-settings
+13b-settings-patterns
 14-new-project
 15-peer-offline
 15b-peer-shares-nothing
@@ -198,6 +203,7 @@ allowed
 allows
 alone
 along
+alongside
 alpha
 alphabetic
 alphabetical
@@ -281,6 +287,7 @@ arrives
 arriving
 arrow
 arrows
+art
 as
 ascii
 aside
@@ -345,6 +352,7 @@ badger
 badges
 bail
 banana
+bang
 bar
 bare
 bars
@@ -362,6 +370,7 @@ because
 become
 becomes
 bed
+bed-01
 beds
 been
 before
@@ -548,6 +557,7 @@ chg
 child
 children
 choice
+choices
 choose
 choosing
 chose
@@ -604,6 +614,7 @@ cog
 col
 collaborative
 collapse
+collapsed
 collapsible
 collapsing
 collect
@@ -635,6 +646,7 @@ comes
 command
 command's
 commands
+comment
 comments
 commit
 commit's
@@ -787,6 +799,7 @@ dated
 day
 days
 db
+dd
 de
 dead
 deadline
@@ -931,10 +944,12 @@ down
 downcast
 downgrade
 draft
+draft-2
 drafts
 drain
 draw
 drawing
+drawings
 drawn
 draws
 drew
@@ -966,6 +981,7 @@ each
 eager
 earlier
 early
+easiest
 easily
 easy
 echo
@@ -977,6 +993,7 @@ edition
 editor
 edits
 effect
+effects
 efforts
 eframe
 egui
@@ -1002,6 +1019,7 @@ encoding
 encrypted
 end
 ended
+ending
 endings
 endorse
 ends
@@ -1050,6 +1068,7 @@ ex
 exact
 exactly
 example
+examples
 except
 exception
 exchange
@@ -1077,9 +1096,13 @@ expected
 expects
 expire
 expired
+explain
+explained
 explains
 explicit
 explorer
+exports
+exposed
 express
 ext
 extend
@@ -1224,6 +1247,7 @@ fp
 frac
 frame
 frame's
+frame-000
 framed
 frameless
 frames
@@ -1280,6 +1304,7 @@ give
 given
 gives
 giving
+glob
 glyph
 glyphs
 go
@@ -1301,6 +1326,7 @@ greets
 grid
 ground
 group
+grouped
 groups
 grow
 growing
@@ -1338,6 +1364,7 @@ happens
 happy
 harmless
 harness
+harness's
 harnesses
 harvest
 has
@@ -1433,9 +1460,11 @@ idle
 ids
 if
 if-addrs
+ignorable
 ignore
 ignored
 ignores
+ignoring
 im
 image
 imagename
@@ -1652,6 +1681,7 @@ links
 lint
 lints
 list
+list's
 listed
 listen
 listener
@@ -1720,6 +1750,7 @@ made-up
 main
 major
 make
+makefile
 makes
 malformed
 man
@@ -1749,12 +1780,14 @@ md
 mdns-sd
 me
 mean
+meaning
 means
 meant
 meanwhile
 measure
 measured
 media
+meeting
 meg
 mellow
 mem
@@ -1794,6 +1827,7 @@ mirror
 mirrored
 mirroring
 mirrors
+mislead
 mismatched
 misread
 missing
@@ -1812,6 +1846,7 @@ mode
 model
 modification
 modified
+modifiers
 modify
 modules
 moment
@@ -1853,8 +1888,12 @@ named
 names
 naming
 nanoseconds
+narrow
+narrowed
 narrower
 narrowest
+narrowing
+narrows
 narwhal
 native
 natural
@@ -1862,12 +1901,14 @@ naïve
 nb
 ne
 near
+nearest
 nedition
 need
 needed
 needle
 needs
 negative
+neighbour
 neither
 nested
 net
@@ -1913,6 +1954,7 @@ normalization
 normalize
 normalizing
 norsrc
+north
 not
 not-a-uuid
 note
@@ -1940,6 +1982,7 @@ obj
 object
 objects
 obtaining
+ocs
 ocsp
 odd
 of
@@ -2057,6 +2100,7 @@ parent
 parents
 parrot
 parse
+parser's
 parses
 part
 partial
@@ -2070,6 +2114,7 @@ passed
 passes
 passing
 past
+pasting
 pat
 patch
 patent
@@ -2108,6 +2153,7 @@ photos
 phrase
 phrase-changes
 phrases
+physical
 pick
 picked
 picker
@@ -2142,6 +2188,9 @@ platform's
 player1
 plays
 plist
+plot
+plot-01
+plot-02
 plucky
 plural
 plurals
@@ -2178,6 +2227,7 @@ preference
 preferred
 prefers
 prefix
+prefixing
 prelude
 prepare
 preparing
@@ -2187,10 +2237,12 @@ presents
 preserved
 press
 pressed
+pressing
 pretend
 pretty
 prev
 preview
+preview's
 previewed
 previews
 previous
@@ -2220,6 +2272,7 @@ project-transfer
 projects
 projtransfer
 promised
+promises
 promote
 prompt
 promptly
@@ -2284,6 +2337,7 @@ quote
 quoted
 quotes
 r
+radio
 radish
 radius
 radix
@@ -2353,6 +2407,7 @@ redraws
 ref
 reference
 refers
+reflows
 refresh
 refreshes
 refreshing
@@ -2524,6 +2579,7 @@ row's
 rows
 rs
 rsms
+rsplit
 rt
 rule
 rules
@@ -2580,6 +2636,7 @@ script
 scripts
 scroll
 scrollable
+scrolls
 sd
 se
 seal
@@ -2681,6 +2738,7 @@ shots
 should
 show
 showed
+showing
 shown
 shows
 shrank
@@ -2724,6 +2782,7 @@ skip
 skipped
 skips
 slash
+slashes
 sleep
 sleepy
 slice
@@ -2876,6 +2935,9 @@ such
 sudo
 suffix
 suffixes
+suggested
+suggestion
+suggestions
 sum
 summary
 summed
@@ -2889,6 +2951,7 @@ surface
 survive
 survives
 surviving
+svg
 swap
 sweep
 sweeper
@@ -3049,6 +3112,7 @@ tracing-subscriber
 tracked
 tracks
 trademark
+trail
 trailing
 trait
 transfer
@@ -3068,6 +3132,7 @@ tried
 tries
 trim
 trimmed
+trimming
 trio
 trip
 trips
@@ -3076,7 +3141,6 @@ truncate
 trust
 trusts
 try
-ts
 ttf
 turn
 turned
@@ -3111,10 +3175,12 @@ unbounded
 unchanged
 unclaimed
 unclear
+unclosed
 under
 undo
 undoes
 unequally
+unescaped
 unexpected
 unfinished
 unhex
@@ -3141,11 +3207,13 @@ unreached
 unreadable
 unrelated
 unsafe
+unseen
 unset
 unspecified
 unstaged
 unstagedword
 unsupported
+untick
 unticked
 until
 untouched
@@ -3287,6 +3355,7 @@ widget
 widgets
 width
 widths
+wildcards
 will
 willing
 win

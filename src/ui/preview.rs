@@ -1,19 +1,34 @@
 //! The preview: what a push or pull will change, before anything is written.
 
 use super::widgets::plural;
-use crate::manifest::Change;
+use crate::manifest::{Change, Kind};
 use crate::model::Direction;
 use crate::transfer::Preview;
 
 /// Paths under these folders collapse to one line with a count.
 const NOISE: &[&str] = &[".git"];
 
-#[derive(Debug, Default, PartialEq)]
+#[derive(Clone, Debug, Default, PartialEq)]
 pub struct Groups {
-    pub added: Vec<String>,
-    pub changed: Vec<String>,
-    pub timestamp_only: Vec<String>,
-    pub removed: Vec<String>,
+    pub added: Vec<Line>,
+    pub changed: Vec<Line>,
+    pub timestamp_only: Vec<Line>,
+    pub removed: Vec<Line>,
+}
+
+/// One line of a list, and the path it is about, so it can be ignored.
+#[derive(Clone, Debug, PartialEq)]
+pub struct Line {
+    /// Its folder's index in `Preview::folders`.
+    pub folder: usize,
+    /// The path inside that folder; for a collapsed folder, the folder.
+    pub rel: String,
+    pub is_dir: bool,
+    pub text: String,
+    /// False for an entry another computer has where this one writes
+    /// something of another kind: leaving out only that entry would let
+    /// what takes its place through, unseen.
+    pub ignorable: bool,
 }
 
 /// How many files the transfer touches, in the same unit as the counts row:
@@ -31,6 +46,18 @@ pub fn confirm_label(p: &Preview, peer: &str) -> String {
     }
 }
 
+/// The path a change is about, and whether it is a folder.
+pub fn path_of(c: &Change) -> (&str, bool) {
+    match c {
+        Change::Add(e) | Change::TimestampOnly(e) => (&e.rel, e.kind == Kind::Dir),
+        Change::Update { entry, .. } | Change::Replace { entry } => {
+            (&entry.rel, entry.kind == Kind::Dir)
+        }
+        Change::RemoveFile(r) => (r, false),
+        Change::RemoveDir { rel, .. } => (rel, true),
+    }
+}
+
 fn noise_root(rel: &str) -> Option<&'static str> {
     NOISE
         .iter()
@@ -38,22 +65,21 @@ fn noise_root(rel: &str) -> Option<&'static str> {
         .copied()
 }
 
-/// Sorts every change into its list. With more than one folder each path
-/// starts with its folder's name.
+/// Sorts every change into its list. Each line keeps its folder and path,
+/// and its text leaves the folder's name out: patterns see paths that way.
 pub fn group(p: &Preview, peer: &str) -> Groups {
     let mut g = Groups::default();
     let newer_where = match p.request.direction {
         Direction::Push => format!("newer on {peer}"),
         Direction::Pull => "newer on this computer".to_string(),
     };
-    let multi = p.folders.len() > 1;
-    for f in &p.folders {
-        let name = |rel: &str| {
-            if multi {
-                format!("{}/{rel}", f.name)
-            } else {
-                rel.to_string()
-            }
+    for (folder, f) in p.folders.iter().enumerate() {
+        let line = |rel: &str, is_dir: bool, text: String| Line {
+            folder,
+            rel: rel.to_string(),
+            is_dir,
+            text,
+            ignorable: true,
         };
         // (list, root) -> count, so noise folders become one line per list.
         let mut noise: Vec<(u8, &str, u64)> = Vec::new();
@@ -65,23 +91,22 @@ pub fn group(p: &Preview, peer: &str) -> Groups {
             None => noise.push((list, root, 1)),
         };
         for c in &f.plan.changes {
-            let (list, rel) = match c {
-                Change::Add(e) => (0, e.rel.as_str()),
-                Change::Update { entry, .. } | Change::Replace { entry } => (1, entry.rel.as_str()),
-                Change::TimestampOnly(e) => (2, e.rel.as_str()),
-                Change::RemoveFile(r) | Change::RemoveDir { rel: r, .. } => (3, r.as_str()),
+            let list = match c {
+                Change::Add(_) => 0,
+                Change::Update { .. } | Change::Replace { .. } => 1,
+                Change::TimestampOnly(_) => 2,
+                Change::RemoveFile(_) | Change::RemoveDir { .. } => 3,
             };
+            let (rel, is_dir) = path_of(c);
             if let Some(root) = noise_root(rel) {
                 bump(list, root);
                 continue;
             }
-            let line = match c {
+            let text = match c {
                 Change::Update {
                     dest_newer: true, ..
-                } => format!("{} ({newer_where})", name(rel)),
-                Change::Replace { .. } => {
-                    format!("{} (replaces a different kind of entry)", name(rel))
-                }
+                } => format!("{rel} ({newer_where})"),
+                Change::Replace { .. } => format!("{rel} (replaces a different kind of entry)"),
                 Change::RemoveDir { files, ignored, .. } => {
                     let total = files + ignored;
                     let ignored = match ignored {
@@ -89,30 +114,33 @@ pub fn group(p: &Preview, peer: &str) -> Groups {
                         n => format!(", {n} of them ignored"),
                     };
                     format!(
-                        "Remove folder {} ({}{ignored})",
-                        name(rel),
+                        "Remove folder {rel} ({}{ignored})",
                         plural(total, "file", "files")
                     )
                 }
-                _ => name(rel),
+                _ => rel.to_string(),
             };
-            g.list(list).push(line);
+            g.list(list).push(line(rel, is_dir, text));
         }
         for (list, root, n) in noise {
-            let line = format!("{} contents ({})", name(root), plural(n, "file", "files"));
-            g.list(list).push(line);
+            let text = format!("{root} contents ({})", plural(n, "file", "files"));
+            g.list(list).push(line(root, true, text));
         }
         // Counted as removed files, so they are listed with the removals.
         for r in &f.replaced {
-            g.removed.push(if r.was_folder {
+            let text = if r.was_folder {
                 format!(
                     "Replace folder {} with {} ({})",
-                    name(&r.rel),
+                    r.rel,
                     r.by,
                     plural(r.files, "file", "files")
                 )
             } else {
-                format!("Replace file {} with {}", name(&r.rel), r.by)
+                format!("Replace file {} with {}", r.rel, r.by)
+            };
+            g.removed.push(Line {
+                ignorable: false,
+                ..line(&r.rel, r.was_folder, text)
             });
         }
     }
@@ -136,7 +164,7 @@ pub fn skipped(p: &Preview) -> Vec<String> {
 }
 
 impl Groups {
-    fn list(&mut self, n: u8) -> &mut Vec<String> {
+    fn list(&mut self, n: u8) -> &mut Vec<Line> {
         match n {
             0 => &mut self.added,
             1 => &mut self.changed,
@@ -185,93 +213,5 @@ pub fn warnings(p: &Preview, peer: &str) -> Vec<String> {
 }
 
 #[cfg(test)]
-mod tests {
-    use super::*;
-    use crate::manifest::{Entry, Kind, Plan};
-    use crate::transfer::{FolderPreview, TransferRequest};
-
-    fn file(rel: &str) -> Entry {
-        Entry {
-            rel: rel.into(),
-            kind: Kind::File {
-                size: 1,
-                mtime_ms: 0,
-                exec: false,
-            },
-        }
-    }
-
-    fn preview(direction: Direction, changes: Vec<Change>) -> Preview {
-        Preview {
-            request: TransferRequest {
-                peer: uuid::Uuid::nil(),
-                project: uuid::Uuid::nil(),
-                direction,
-                send_everything: false,
-            },
-            folders: vec![FolderPreview {
-                folder: uuid::Uuid::nil(),
-                name: "app".into(),
-                source_path: "/a".into(),
-                dest_path: "/b".into(),
-                dest_will_be_created: false,
-                plan: Plan {
-                    changes,
-                    needs_hash: vec![],
-                },
-                skipped: vec![("aux.txt".into(), "`aux.txt` is reserved on Windows.".into())],
-                replaced: vec![],
-            }],
-            left_out: Vec::new(),
-            warnings: vec![],
-            link: None,
-            description: false,
-        }
-    }
-
-    #[test]
-    fn a_pull_says_the_newer_file_is_on_this_computer() {
-        let changes = vec![Change::Update {
-            entry: file("README.md"),
-            dest_newer: true,
-        }];
-        let g = group(&preview(Direction::Pull, changes.clone()), "Desk");
-        assert_eq!(g.changed, ["README.md (newer on this computer)"]);
-        let g = group(&preview(Direction::Push, changes), "Desk");
-        assert_eq!(g.changed, ["README.md (newer on Desk)"]);
-    }
-
-    #[test]
-    fn the_button_counts_files_like_the_counts_row() {
-        let p = preview(
-            Direction::Push,
-            vec![
-                Change::Add(file("a")),
-                Change::RemoveDir {
-                    rel: "old".into(),
-                    files: 2,
-                    ignored: 3,
-                },
-            ],
-        );
-        assert_eq!(file_count(&p), 6);
-        assert_eq!(confirm_label(&p, "Desk"), "Push 6 file changes to Desk");
-        let one = preview(Direction::Pull, vec![Change::Add(file("a"))]);
-        assert_eq!(confirm_label(&one, "Desk"), "Pull 1 file change from Desk");
-    }
-
-    #[test]
-    fn a_skipped_name_is_listed_once_and_summed_up_on_top() {
-        let p = preview(Direction::Push, vec![]);
-        assert_eq!(skipped(&p), ["aux.txt is reserved on Windows."]);
-        let w = warnings(&p, "Desk");
-        assert_eq!(w, ["1 file can't be copied to Desk and will be skipped."]);
-    }
-
-    #[test]
-    fn noise_roots_match_whole_names_only() {
-        assert_eq!(noise_root(".git/HEAD"), Some(".git"));
-        assert_eq!(noise_root(".git"), Some(".git"));
-        assert_eq!(noise_root(".github/workflows"), None);
-    }
-}
+#[path = "preview_tests.rs"]
+mod tests;
