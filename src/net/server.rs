@@ -225,7 +225,7 @@ pub(super) async fn session<S: AsyncRead + AsyncWrite + Unpin + Send>(
     }
 }
 
-fn is_eof(e: &anyhow::Error) -> bool {
+pub(super) fn is_eof(e: &anyhow::Error) -> bool {
     e.downcast_ref::<std::io::Error>()
         .is_some_and(|io| io.kind() == std::io::ErrorKind::UnexpectedEof)
 }

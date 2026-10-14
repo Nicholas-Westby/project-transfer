@@ -17,3 +17,4 @@ pub mod store;
 pub mod transfer;
 pub mod ui;
 pub mod units;
+pub mod viewer;

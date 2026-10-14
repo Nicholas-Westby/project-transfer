@@ -6,6 +6,7 @@ use crate::model::{
 };
 use crate::protocol::RemoteProject;
 use crate::transfer::{Preview, Summary};
+use crate::viewer::FileView;
 use std::collections::HashMap;
 use std::net::SocketAddr;
 use std::sync::{Arc, Mutex, MutexGuard};
@@ -36,6 +37,8 @@ pub struct UiState {
     /// The selected peer's projects, as of its last status answer.
     pub remote_projects: HashMap<ProjectId, RemoteProject>,
     pub command_runs: HashMap<CommandId, CommandRun>,
+    /// The file the viewer over the preview shows, if any.
+    pub file_view: Option<FileView>,
 }
 
 impl UiState {
@@ -54,6 +57,7 @@ impl UiState {
             transfer: TransferState::Idle,
             remote_projects: HashMap::new(),
             command_runs: HashMap::new(),
+            file_view: None,
         }
     }
 

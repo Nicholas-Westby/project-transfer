@@ -113,6 +113,12 @@ async fn paths_leaving_the_folder_are_refused() {
             folder: p.primary,
             rel: "../../victim.txt".into(),
         },
+        Request::ReadFile {
+            project: p.id,
+            folder: p.primary,
+            rel: "../../victim.txt".into(),
+            max: 10,
+        },
         Request::Hashes {
             project: p.id,
             folder: p.primary,

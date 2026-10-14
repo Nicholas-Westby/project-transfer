@@ -8,6 +8,9 @@ use crate::protocol::{Response, write_msg};
 use crate::transfer::projects::{StartedBy, record_transfer};
 use crate::transfer::safe_join;
 use anyhow::bail;
+use std::fs::Metadata;
+use std::path::PathBuf;
+use tokio::fs::File;
 use tokio::io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt};
 use tracing::{info, warn};
 
@@ -19,25 +22,7 @@ pub async fn get_file<S: AsyncRead + AsyncWrite + Unpin>(
     folder: FolderId,
     rel: &str,
 ) -> anyhow::Result<()> {
-    let me = ctx.shared.settings.read().await.name.clone();
-    let root = stored_root(ctx.shared, project, folder).await;
-    let opened = async {
-        let root = root
-            .as_ref()
-            .ok_or_else(|| format!("{me} has no folder set up for this project."))?;
-        let path = safe_join(root, rel).map_err(|e| e.to_string())?;
-        let not_file = || format!("\"{rel}\" is not a file on {me}.");
-        let meta = std::fs::symlink_metadata(&path).map_err(|_| not_file())?;
-        if !meta.is_file() {
-            return Err(not_file());
-        }
-        let file = tokio::fs::File::open(&path)
-            .await
-            .map_err(|e| format!("Could not open \"{rel}\" on {me}: {e}"))?;
-        let meta = file.metadata().await.map_err(|e| e.to_string())?;
-        Ok((file, meta))
-    }
-    .await;
+    let (root, opened) = open_in_folder(ctx, project, folder, rel).await;
     let (file, meta) = match opened {
         Ok(x) => x,
         Err(reason) => {
@@ -68,6 +53,43 @@ pub async fn get_file<S: AsyncRead + AsyncWrite + Unpin>(
         bail!("\"{rel}\" shrank while it was being sent");
     }
     Ok(())
+}
+
+/// A file in a folder this computer has set up, opened for a paired
+/// computer: never through a link and never outside the folder. Comes with
+/// the folder, when there is one, for the log; the error is worded for that
+/// computer.
+pub(super) async fn open_in_folder(
+    ctx: &Ctx<'_>,
+    project: ProjectId,
+    folder: FolderId,
+    rel: &str,
+) -> (Option<PathBuf>, Result<(File, Metadata), String>) {
+    let me = ctx.shared.settings.read().await.name.clone();
+    let root = stored_root(ctx.shared, project, folder).await;
+    let opened = async {
+        let root = root
+            .as_ref()
+            .ok_or_else(|| format!("{me} has no folder set up for this project."))?;
+        let path = safe_join(root, rel).map_err(|e| e.to_string())?;
+        let not_file = || format!("\"{rel}\" is not a file on {me}.");
+        let meta = std::fs::symlink_metadata(&path).map_err(|_| not_file())?;
+        if meta.file_type().is_symlink() {
+            return Err(format!(
+                "\"{rel}\" is a link on {me}, not a file, so it can't be read."
+            ));
+        }
+        if !meta.is_file() {
+            return Err(not_file());
+        }
+        let file = File::open(&path)
+            .await
+            .map_err(|e| format!("Could not open \"{rel}\" on {me}: {e}"))?;
+        let meta = file.metadata().await.map_err(|e| e.to_string())?;
+        Ok((file, meta))
+    }
+    .await;
+    (root, opened)
 }
 
 pub async fn end_pull(

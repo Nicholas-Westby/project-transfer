@@ -69,6 +69,19 @@ and why, including how many of those files were removed since the last
 transfer. If ignoring files from the preview turns a sync the other way,
 the preview says so.
 
+## Looking at a file before it moves
+
+In a transfer's preview, click a file to see it. A file that is different on
+the two computers shows both copies side by side, **Here** on the left and
+**On <other computer>** on the right, with the lines that differ tinted. A
+file only one computer has, or one where only the modified time differs,
+shows one copy. Each copy says whether the transfer sends it, replaces it or
+removes it.
+
+The viewer shows text, up to the first 1 MB of each copy. Seeing the other
+computer's copy needs that computer to allow pulls from this one, and a
+version of Project Transfer that has the viewer.
+
 ## Where folders go on the other computer
 
 Each computer keeps its own path for every folder of a project. The folders

@@ -14,6 +14,7 @@ mod handlers;
 mod handshake;
 mod pair_client;
 mod pair_server;
+mod peek;
 mod relay;
 mod routes;
 mod server;
@@ -30,6 +31,7 @@ mod through_tests;
 pub use client::{Connection, NotThePairedComputer};
 pub use gate::may_ask;
 pub use pair_client::{PairStarted, pair_finish, pair_start};
+pub use peek::{FilePart, PartError};
 pub use server::serve;
 
 /// What the server needs, shared with the app core.

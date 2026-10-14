@@ -256,7 +256,8 @@ pub fn plural(n: u64, one: &str, many: &str) -> String {
 
 /// "just now", "3 min ago", "2 hours ago", "yesterday", "4 days ago".
 pub fn ago(now_ms: i64, then_ms: i64) -> String {
-    let secs = (now_ms - then_ms).max(0) / 1000;
+    // The other computer's clock can say anything.
+    let secs = now_ms.saturating_sub(then_ms).max(0) / 1000;
     match secs {
         0..60 => "just now".into(),
         60..3600 => format!("{} min ago", secs / 60),
@@ -301,6 +302,12 @@ mod tests {
         assert_eq!(ago(now, now - 5 * 3_600_000), "5 hours ago");
         assert_eq!(ago(now, now - 30 * 3_600_000), "yesterday");
         assert_eq!(ago(now, now - 4 * 86_400_000), "4 days ago");
+    }
+
+    #[test]
+    fn a_time_from_any_clock_never_overflows() {
+        assert!(ago(1_700_000_000_000, i64::MIN).ends_with("days ago"));
+        assert_eq!(ago(0, i64::MAX), "just now");
     }
 
     #[test]

@@ -62,7 +62,8 @@ pub fn need(req: &Request) -> Need {
         | R::Manifest { .. }
         | R::Hashes { .. }
         | R::ExchangeCommands { .. } => Need::PullOrPush,
-        R::GetFile { .. } | R::EndPull { .. } => Need::Pull,
+        // Reading a file to show it hands over its content, as a pull does.
+        R::GetFile { .. } | R::ReadFile { .. } | R::EndPull { .. } => Need::Pull,
         R::BeginPush { .. }
         | R::PutFile { .. }
         | R::MakeDir { .. }

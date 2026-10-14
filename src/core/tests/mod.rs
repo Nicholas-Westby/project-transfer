@@ -9,6 +9,7 @@ mod paired;
 mod projects;
 mod reach;
 mod sync;
+mod viewer;
 
 use std::time::{Duration, Instant};
 

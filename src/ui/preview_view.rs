@@ -5,6 +5,7 @@ use super::preview::{Groups, Line, group, skipped, warnings};
 use super::theme::{CONTROL_RADIUS, Palette};
 use super::widgets::{self, plural};
 use crate::transfer::Preview;
+use crate::viewer::Copies;
 use egui::text::LayoutJob;
 use egui::{
     Align, Align2, CollapsingHeader, Color32, CursorIcon, FontId, Id, Layout, Rect, RichText,
@@ -19,9 +20,29 @@ const IGNORE_ROOM: f32 = 64.0;
 /// while a pattern is typed.
 const MATCHES_SHOWN: usize = 200;
 
+/// What was picked in a preview's lists.
+#[derive(Clone, Debug, PartialEq)]
+pub enum Picked {
+    /// "Ignore…" on a line, or "Ignore files…": the dialog to open.
+    Ignore(Box<Draft>),
+    /// A file's line, to show the file: its folder's index in
+    /// `Preview::folders`, its path, and which copies it is about.
+    Open {
+        folder: usize,
+        rel: String,
+        copies: Copies,
+    },
+}
+
+/// Which part of a line was clicked.
+enum Click {
+    Open,
+    Ignore,
+}
+
 /// Draws the body of a ready preview: folders, warnings, counts, lists.
-/// Returns the dialog to open when something was picked to ignore.
-pub fn show(ui: &mut Ui, p: &Preview, peer: &str) -> Option<Draft> {
+/// Returns what was picked in it, if anything.
+pub fn show(ui: &mut Ui, p: &Preview, peer: &str) -> Option<Picked> {
     let pal = Palette::of(ui.ctx());
     folder_lines(ui, p);
     let warnings = warnings(p, peer);
@@ -45,7 +66,7 @@ pub fn show(ui: &mut Ui, p: &Preview, peer: &str) -> Option<Draft> {
         if !p.request.send_everything {
             ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
                 if widgets::quiet(ui, "Ignore files…", Some(pal.route)).clicked() {
-                    picked = Some(Draft::blank());
+                    picked = Some(Picked::Ignore(Box::new(Draft::blank())));
                 }
             });
         }
@@ -65,12 +86,13 @@ pub fn show(ui: &mut Ui, p: &Preview, peer: &str) -> Option<Draft> {
 
 /// The preview's lists. Deletions and rewrites open by default: they are
 /// what can lose work. With `matches` they list what a new pattern would
-/// leave out instead: all open, and nothing to ignore or skip.
-pub fn lists(ui: &mut Ui, p: &Preview, g: &Groups, matches: bool) -> Option<Draft> {
+/// leave out instead: all open, and nothing to open, ignore or skip.
+pub fn lists(ui: &mut Ui, p: &Preview, g: &Groups, matches: bool) -> Option<Picked> {
     let pal = Palette::of(ui.ctx());
     let c = p.counts();
     let shown = if matches { MATCHES_SHOWN } else { usize::MAX };
     let ignorable = !matches && !p.request.send_everything;
+    let openable = !matches;
     let mut picked = None;
     for (title, files, items, color, open) in [
         ("Removed", c.removed_files, &g.removed, pal.removed, true),
@@ -88,8 +110,8 @@ pub fn lists(ui: &mut Ui, p: &Preview, g: &Groups, matches: bool) -> Option<Draf
             continue;
         }
         list(ui, title, files, open, |ui| {
-            if let Some(line) = lines(ui, p, items, shown, color, ignorable) {
-                picked = Some(Draft::for_path(&line.rel, line.is_dir));
+            if let Some(pick) = lines(ui, p, items, shown, color, ignorable, openable) {
+                picked = Some(pick);
             }
         });
     }
@@ -125,15 +147,16 @@ fn list(ui: &mut Ui, title: &str, files: u64, open: bool, add: impl FnOnce(&mut 
 
 /// A list's first `shown` lines, under their folder's name when the
 /// project has more than one: the paths start inside the folder, as
-/// patterns do. Returns the line whose Ignore button was clicked.
-fn lines<'a>(
+/// patterns do. Returns what was picked on a line.
+fn lines(
     ui: &mut Ui,
     p: &Preview,
-    items: &'a [Line],
+    items: &[Line],
     shown: usize,
     color: Color32,
     ignorable: bool,
-) -> Option<&'a Line> {
+    openable: bool,
+) -> Option<Picked> {
     let pal = Palette::of(ui.ctx());
     let multi = p.folders.len() > 1;
     let mut folder = None;
@@ -144,9 +167,22 @@ fn lines<'a>(
             let name = &p.folders[line.folder].name;
             ui.label(RichText::new(name).small().strong().color(pal.muted()));
         }
-        let id = (ignorable && line.ignorable).then(|| ui.id().with((line.folder, &line.rel)));
-        if row(ui, path_line(&line.text, color, pal.ink), id) {
-            picked = Some(line);
+        let id = ui.id().with((line.folder, &line.rel));
+        let copies = line.copies.filter(|_| openable);
+        let job = path_line(&line.text, color, pal.ink);
+        match row(ui, job, id, ignorable && line.ignorable, copies.is_some()) {
+            Some(Click::Ignore) => {
+                let d = Draft::for_path(&line.rel, line.is_dir);
+                picked = Some(Picked::Ignore(Box::new(d)));
+            }
+            Some(Click::Open) => {
+                picked = copies.map(|copies| Picked::Open {
+                    folder: line.folder,
+                    rel: line.rel.clone(),
+                    copies,
+                })
+            }
+            None => {}
         }
     }
     if items.len() > shown {
@@ -155,14 +191,15 @@ fn lines<'a>(
     picked
 }
 
-/// One line. Given an id, an "Ignore…" button shows at its end while the
-/// pointer is on the row; true once it is clicked. Drawn by hand in room
-/// kept for it, so showing it never moves the text or the rows below.
-fn row(ui: &mut Ui, job: LayoutJob, ignorable: Option<Id>) -> bool {
-    let Some(id) = ignorable else {
+/// One line. An openable one opens with a click anywhere on it. An
+/// ignorable one shows an "Ignore…" button at its end while the pointer is
+/// on the row, drawn by hand in room kept for it, so showing it never moves
+/// the text or the rows below.
+fn row(ui: &mut Ui, job: LayoutJob, id: Id, ignorable: bool, openable: bool) -> Option<Click> {
+    if !ignorable && !openable {
         ui.label(job);
-        return false;
-    };
+        return None;
+    }
     let width = ui.available_width();
     let backdrop = ui.painter().add(egui::Shape::Noop);
     let text = ui
@@ -172,28 +209,40 @@ fn row(ui: &mut Ui, job: LayoutJob, ignorable: Option<Id>) -> bool {
         .response
         .rect;
     let rect = Rect::from_min_size(text.min, vec2(width, text.height()));
+    // Added before the Ignore button, which then wins where they overlap.
+    // Mouse only, like the Ignore… button: as Tab stops the lines would be
+    // unseen stops, one per file, before the sheet's buttons.
+    let open = openable.then(|| {
+        ui.interact(rect, id.with("open"), Sense::CLICK)
+            .on_hover_cursor(CursorIcon::PointingHand)
+    });
     if !ui.rect_contains_pointer(rect) {
-        return false;
+        return None;
     }
     let pal = Palette::of(ui.ctx());
     let fill = ui.visuals().widgets.inactive.weak_bg_fill;
     let shape = egui::epaint::RectShape::filled(rect.expand2(vec2(4.0, 1.0)), CONTROL_RADIUS, fill);
     ui.painter().set(backdrop, shape);
-    let room = Rect::from_min_max(egui::pos2(rect.right() - IGNORE_ROOM, rect.top()), rect.max);
-    let r = ui
-        .interact(room, id, Sense::click())
-        .on_hover_cursor(CursorIcon::PointingHand);
-    let color = if r.hovered() { pal.ink } else { pal.route };
-    let font = FontId::proportional(13.0);
-    ui.painter().text(
-        room.right_center(),
-        Align2::RIGHT_CENTER,
-        "Ignore…",
-        font,
-        color,
-    );
-    r.widget_info(|| WidgetInfo::labeled(WidgetType::Button, true, "Ignore…"));
-    r.clicked()
+    if ignorable {
+        let room = Rect::from_min_max(egui::pos2(rect.right() - IGNORE_ROOM, rect.top()), rect.max);
+        let r = ui
+            .interact(room, id, Sense::click())
+            .on_hover_cursor(CursorIcon::PointingHand);
+        let color = if r.hovered() { pal.ink } else { pal.route };
+        let font = FontId::proportional(13.0);
+        ui.painter().text(
+            room.right_center(),
+            Align2::RIGHT_CENTER,
+            "Ignore…",
+            font,
+            color,
+        );
+        r.widget_info(|| WidgetInfo::labeled(WidgetType::Button, true, "Ignore…"));
+        if r.clicked() {
+            return Some(Click::Ignore);
+        }
+    }
+    open.filter(|r| r.clicked()).map(|_| Click::Open)
 }
 
 /// A list line with its marker in the signal color and the text in mono.

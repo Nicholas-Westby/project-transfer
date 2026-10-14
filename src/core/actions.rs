@@ -4,6 +4,7 @@ use super::Core;
 use crate::discovery::Discovered;
 use crate::model::{CommandId, FolderId, InstanceId, Permissions, ProjectId, ThemeChoice};
 use crate::transfer::TransferRequest;
+use crate::viewer::FileAsk;
 use std::path::PathBuf;
 
 #[derive(Clone, Debug, PartialEq)]
@@ -75,6 +76,10 @@ pub enum Action {
     CancelTransfer,
     /// Returns to `TransferState::Idle` after a preview, result or failure.
     DismissTransfer,
+    /// Shows a file of the open preview, reading both computers' copies.
+    OpenFile(FileAsk),
+    /// Closes the file the viewer shows.
+    CloseFile,
 
     /// Project, label, command line.
     AddCommand(ProjectId, String, String),
@@ -156,6 +161,14 @@ impl Core {
             }
             Action::DismissTransfer => {
                 self.dismiss_transfer();
+                Ok(())
+            }
+            Action::OpenFile(ask) => {
+                self.open_file(ask);
+                Ok(())
+            }
+            Action::CloseFile => {
+                self.close_file();
                 Ok(())
             }
 

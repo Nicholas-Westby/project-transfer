@@ -17,6 +17,7 @@ mod settings;
 mod state;
 mod transfer_words;
 mod transfers;
+mod viewer;
 
 #[cfg(test)]
 mod tests;
@@ -88,6 +89,10 @@ struct Core {
     poll_now: Arc<Notify>,
     /// The last poll failure shown per peer, so it is said once.
     poll_problems: Arc<Mutex<HashMap<InstanceId, String>>>,
+    /// The read behind the file viewer, stopped when the viewer goes.
+    viewer: Arc<Mutex<Option<tokio::task::AbortHandle>>>,
+    /// Counts files opened, so a late read of an earlier one is dropped.
+    opened: Arc<std::sync::atomic::AtomicU64>,
 }
 
 /// A panic in one task must not wedge every other user of the lock.
@@ -155,6 +160,8 @@ impl AppCore {
             runs: Arc::new(Mutex::new(HashMap::new())),
             poll_now: Arc::new(Notify::new()),
             poll_problems: Arc::new(Mutex::new(HashMap::new())),
+            viewer: Default::default(),
+            opened: Default::default(),
         };
 
         let server_ui = ui.clone();

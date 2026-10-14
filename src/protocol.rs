@@ -5,14 +5,19 @@ use crate::manifest::Manifest;
 use crate::model::{
     Command, Description, FolderId, InstanceId, Os, Permissions, Project, ProjectId,
 };
-use anyhow::{Context, bail};
-use serde::{Deserialize, Serialize, de::DeserializeOwned};
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::net::IpAddr;
-use tokio::io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt};
+
+#[path = "protocol_framing.rs"]
+mod framing;
+pub use framing::{read_msg, read_msg_limited, write_msg};
 
 pub const PROTOCOL_VERSION: u32 = 3;
 const MAX_MSG: u32 = 64 * 1024 * 1024;
+/// The most of a file one `ReadFile` answer carries, and so the most the
+/// file viewer shows of each copy.
+pub const MAX_PART: u64 = 1024 * 1024;
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
 pub enum Request {
@@ -93,6 +98,16 @@ pub enum Request {
         folder: FolderId,
         rel: String,
     },
+    /// The start of a file, to show it: answered with `FilePart` and then
+    /// `len` raw bytes, or `Refused`. A version that doesn't know this
+    /// request closes the connection instead.
+    ReadFile {
+        project: ProjectId,
+        folder: FolderId,
+        rel: String,
+        /// The most bytes to send; never more than `MAX_PART` are.
+        max: u64,
+    },
     /// The sender's project with `local_path` cleared. `expected_path` is
     /// the destination the confirmed preview showed for this folder; the
     /// receiver refuses if its folder is somewhere else now.
@@ -169,6 +184,7 @@ impl Request {
             Request::Manifest { .. } => "Manifest",
             Request::Hashes { .. } => "Hashes",
             Request::GetFile { .. } => "GetFile",
+            Request::ReadFile { .. } => "ReadFile",
             Request::BeginPush { .. } => "BeginPush",
             Request::PutFile { .. } => "PutFile",
             Request::MakeDir { .. } => "MakeDir",
@@ -215,6 +231,13 @@ pub enum Response {
         size: u64,
         mtime_ms: i64,
         exec: bool,
+    },
+    /// The start of a file: `size` is the whole file's, and `len` bytes
+    /// from its start follow.
+    FilePart {
+        size: u64,
+        mtime_ms: i64,
+        len: u64,
     },
     /// The merged list, without `last_run_hash`.
     Commands(Vec<Command>),
@@ -275,56 +298,6 @@ pub struct RemoteFolder {
     /// `path` with `~` for the answering computer's home, for display.
     #[serde(default)]
     pub shown: Option<String>,
-}
-
-/// u32 big-endian length, then JSON.
-pub async fn write_msg<W: AsyncWrite + Unpin, T: Serialize>(
-    w: &mut W,
-    msg: &T,
-) -> anyhow::Result<()> {
-    let mut framed = vec![0u8; 4];
-    serde_json::to_writer(&mut framed, msg)?;
-    let len = framed.len() - 4;
-    if len as u64 > MAX_MSG as u64 {
-        bail!("message of {len} bytes is over the 64 MiB limit");
-    }
-    framed[..4].copy_from_slice(&(len as u32).to_be_bytes());
-    // One write: over TLS a write is a record, and without Nagle a packet.
-    w.write_all(&framed).await?;
-    w.flush().await?;
-    Ok(())
-}
-
-pub async fn read_msg<R: AsyncRead + Unpin, T: DeserializeOwned>(r: &mut R) -> anyhow::Result<T> {
-    read_msg_limited(r, MAX_MSG).await
-}
-
-/// Like `read_msg`, with a lower cap for callers that expect only small messages.
-pub async fn read_msg_limited<R: AsyncRead + Unpin, T: DeserializeOwned>(
-    r: &mut R,
-    max: u32,
-) -> anyhow::Result<T> {
-    let mut len = [0u8; 4];
-    r.read_exact(&mut len).await?;
-    let len = u32::from_be_bytes(len);
-    // Checked before allocating so a bad peer cannot make us reserve gigabytes.
-    if len > max.min(MAX_MSG) {
-        bail!(
-            "incoming message of {len} bytes is over the {} limit",
-            size(max.min(MAX_MSG))
-        );
-    }
-    let mut body = vec![0u8; len as usize];
-    r.read_exact(&mut body).await?;
-    serde_json::from_slice(&body).context("could not parse message")
-}
-
-fn size(bytes: u32) -> String {
-    match bytes {
-        b if b % (1024 * 1024) == 0 => format!("{} MiB", b / (1024 * 1024)),
-        b if b % 1024 == 0 => format!("{} KiB", b / 1024),
-        b => format!("{b} bytes"),
-    }
 }
 
 #[cfg(test)]

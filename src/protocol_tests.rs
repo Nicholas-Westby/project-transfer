@@ -1,7 +1,7 @@
 use super::*;
 use std::pin::Pin;
 use std::task::{Context, Poll};
-use tokio::io::AsyncWrite;
+use tokio::io::{AsyncWrite, AsyncWriteExt};
 
 #[tokio::test]
 async fn framing_round_trips() {
@@ -66,6 +66,27 @@ async fn a_message_goes_out_in_one_write() {
     let mut w = Writes::default();
     write_msg(&mut w, &Request::Status).await.unwrap();
     assert_eq!(w.0.len(), 1, "{:?}", w.0);
+}
+
+#[tokio::test]
+async fn reading_a_file_part_round_trips() {
+    let (mut a, mut b) = tokio::io::duplex(1024);
+    let ask = Request::ReadFile {
+        project: uuid::Uuid::from_u128(1),
+        folder: uuid::Uuid::from_u128(2),
+        rel: "src/main.rs".into(),
+        max: MAX_PART,
+    };
+    let part = Response::FilePart {
+        size: 3_000_000,
+        mtime_ms: 1_700_000_000_000,
+        len: MAX_PART,
+    };
+    write_msg(&mut a, &ask).await.unwrap();
+    write_msg(&mut a, &part).await.unwrap();
+    assert_eq!(read_msg::<_, Request>(&mut b).await.unwrap(), ask);
+    assert_eq!(read_msg::<_, Response>(&mut b).await.unwrap(), part);
+    assert_eq!(ask.kind(), "ReadFile");
 }
 
 #[test]

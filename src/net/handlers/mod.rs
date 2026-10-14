@@ -17,6 +17,7 @@ use tokio::io::{AsyncRead, AsyncWrite};
 use tracing::info;
 
 mod details;
+mod peek;
 mod pull;
 mod push;
 
@@ -81,6 +82,12 @@ pub async fn handle<S: AsyncRead + AsyncWrite + Unpin + Send>(
             folder,
             rel,
         } => return pull::get_file(ctx, stream, project, folder, &rel).await,
+        Request::ReadFile {
+            project,
+            folder,
+            rel,
+            max,
+        } => return peek::read_file(ctx, stream, project, folder, &rel, max).await,
         Request::EndPull { project, files } => {
             pull::end_pull(ctx, project, files, state.scanned_ms).await
         }

@@ -89,7 +89,12 @@ impl Core {
             let mut slot = lock(&self.transfer);
             let g = slot.reset();
             slot.asked = Some((req.clone(), sync));
-            self.ui.update(|s| s.transfer = TransferState::Preparing);
+            self.stop_viewer();
+            self.ui.update(|s| {
+                s.transfer = TransferState::Preparing;
+                // A file of the old preview may be gone from the new one.
+                s.file_view = None;
+            });
             g
         };
         let core = self.clone();
@@ -159,7 +164,9 @@ impl Core {
             };
             slot.cancel = Some(cancel.clone());
             let (files, total) = preview.totals();
+            self.stop_viewer();
             self.ui.update(|s| {
+                s.file_view = None;
                 s.transfer = TransferState::Running {
                     done: 0,
                     total,
@@ -244,7 +251,11 @@ impl Core {
         }
         let mut slot = lock(&self.transfer);
         slot.reset();
-        self.ui.update(|s| s.transfer = TransferState::Idle);
+        self.stop_viewer();
+        self.ui.update(|s| {
+            s.transfer = TransferState::Idle;
+            s.file_view = None;
+        });
     }
 }
 

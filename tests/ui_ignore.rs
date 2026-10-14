@@ -37,7 +37,7 @@ fn folders_head_their_lines_instead_of_prefixing_them() {
 
 #[test]
 fn pointing_at_a_line_offers_to_ignore_it() {
-    let (_, mut h) = preview_harness();
+    let (fake, mut h) = preview_harness();
     assert!(h.query_by_label("Ignore…").is_none());
     h.get_by_label_contains("README.md").hover();
     h.run();
@@ -46,6 +46,8 @@ fn pointing_at_a_line_offers_to_ignore_it() {
     let d = h.state().view.ignore.clone().expect("the dialog opens");
     assert_eq!(d.pattern, "/README.md");
     assert_eq!(d.options[0].label, "This file only");
+    // The line opens the viewer, but not through its Ignore… button.
+    assert!(fake.actions().is_empty(), "{:?}", fake.actions());
 }
 
 #[test]

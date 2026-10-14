@@ -8,6 +8,8 @@ mod computers;
 mod confirmations;
 pub mod description;
 pub mod dialogs;
+mod file_panes;
+mod file_view;
 mod folders;
 mod ignore_effect;
 mod ignore_sheet;

@@ -4,6 +4,7 @@ use super::widgets::plural;
 use crate::manifest::{Change, Kind};
 use crate::model::Direction;
 use crate::transfer::Preview;
+use crate::viewer::Copies;
 
 /// Paths under these folders collapse to one line with a count.
 const NOISE: &[&str] = &[".git"];
@@ -29,6 +30,9 @@ pub struct Line {
     /// something of another kind: leaving out only that entry would let
     /// what takes its place through, unseen.
     pub ignorable: bool,
+    /// Which copies of the file the viewer shows for this line; None when
+    /// it is not about one file.
+    pub copies: Option<Copies>,
 }
 
 /// How many files the transfer touches, in the same unit as the counts row:
@@ -74,12 +78,13 @@ pub fn group(p: &Preview, peer: &str) -> Groups {
         Direction::Pull => "newer on this computer".to_string(),
     };
     for (folder, f) in p.folders.iter().enumerate() {
-        let line = |rel: &str, is_dir: bool, text: String| Line {
+        let line = |rel: &str, is_dir: bool, text: String, copies: Option<Copies>| Line {
             folder,
             rel: rel.to_string(),
             is_dir,
             text,
             ignorable: true,
+            copies,
         };
         // (list, root) -> count, so noise folders become one line per list.
         let mut noise: Vec<(u8, &str, u64)> = Vec::new();
@@ -120,11 +125,12 @@ pub fn group(p: &Preview, peer: &str) -> Groups {
                 }
                 _ => rel.to_string(),
             };
-            g.list(list).push(line(rel, is_dir, text));
+            let copies = Copies::of(c, p.request.direction);
+            g.list(list).push(line(rel, is_dir, text, copies));
         }
         for (list, root, n) in noise {
             let text = format!("{root} contents ({})", plural(n, "file", "files"));
-            g.list(list).push(line(root, true, text));
+            g.list(list).push(line(root, true, text, None));
         }
         // Counted as removed files, so they are listed with the removals.
         for r in &f.replaced {
@@ -140,7 +146,7 @@ pub fn group(p: &Preview, peer: &str) -> Groups {
             };
             g.removed.push(Line {
                 ignorable: false,
-                ..line(&r.rel, r.was_folder, text)
+                ..line(&r.rel, r.was_folder, text, None)
             });
         }
     }

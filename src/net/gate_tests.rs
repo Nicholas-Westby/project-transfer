@@ -111,6 +111,15 @@ fn all_requests() -> Vec<(Request, Need)> {
             Need::Pull,
         ),
         (
+            R::ReadFile {
+                project: u(),
+                folder: u(),
+                rel: "a".into(),
+                max: 1,
+            },
+            Need::Pull,
+        ),
+        (
             R::PutFile {
                 rel: "a".into(),
                 size: 1,

@@ -1,14 +1,15 @@
 //! The large sheet over the project view for a transfer: comparing, the
 //! preview, progress, and the result.
 
-use super::ignore_sheet::Draft;
+use super::preview_view::Picked;
 use super::theme::Palette;
 use super::widgets::{self, plural};
-use super::{App, dialogs, preview, preview_view, transfer_running};
+use super::{App, dialogs, file_view, preview, preview_view, transfer_running};
 use crate::core::{Action, TransferState, UiState};
 use crate::model::Direction;
 use crate::transfer::{Preview, Summary};
 use crate::units::{size, speed, took};
+use crate::viewer::{FileAsk, FileView};
 use egui::{RichText, Ui};
 use std::time::Duration;
 
@@ -74,10 +75,21 @@ impl App {
                     ready(ui, p, &peer)
                 });
                 let (answer, picked) = r.inner;
-                if picked.is_some() {
-                    self.view.ignore = picked;
+                match picked {
+                    Some(Picked::Ignore(d)) => self.view.ignore = Some(*d),
+                    Some(Picked::Open {
+                        folder,
+                        rel,
+                        copies,
+                    }) => self.act(Action::OpenFile(FileAsk::new(p, folder, &rel, copies))),
+                    None => {}
                 }
                 self.ignore_sheet(ui, s, p, &peer);
+                if let Some(v) = &s.file_view
+                    && file_view::sheet(ui, v, p.request.direction, &peer, folder_of(p, v))
+                {
+                    self.act(Action::CloseFile);
+                }
                 match (r.dismissed, answer) {
                     (true, _) | (_, Some(false)) => Some(Action::CancelTransfer),
                     (_, Some(true)) if p.is_empty() => Some(Action::DismissTransfer),
@@ -132,8 +144,8 @@ impl App {
     }
 }
 
-/// The preview, and the dialog to open when something was picked to ignore.
-fn ready(ui: &mut Ui, p: &Preview, peer: &str) -> (Option<bool>, Option<Draft>) {
+/// The preview, and what was picked in it.
+fn ready(ui: &mut Ui, p: &Preview, peer: &str) -> (Option<bool>, Option<Picked>) {
     let pal = Palette::of(ui.ctx());
     if p.is_empty() {
         let what = match p.request.direction {
@@ -172,6 +184,13 @@ fn ready(ui: &mut Ui, p: &Preview, peer: &str) -> (Option<bool>, Option<Draft>) 
     let removes = p.counts().removed_files > 0;
     let label = preview::confirm_label(p, peer);
     (dialogs::button_row(ui, &label, removes, true), picked)
+}
+
+/// The viewed file's folder, when the project has more than one: two
+/// folders can hold files with the same path.
+fn folder_of<'a>(p: &'a Preview, v: &FileView) -> Option<&'a str> {
+    let f = p.folders.iter().find(|f| f.folder == v.ask.folder)?;
+    (p.folders.len() > 1).then_some(f.name.as_str())
 }
 
 fn finished(ui: &mut Ui, sum: &Summary, dir: Direction, peer: &str) {

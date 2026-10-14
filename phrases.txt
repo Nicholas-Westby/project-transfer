@@ -19,6 +19,7 @@ AsyncReadExt
 AsyncWrite
 AsyncWriteExt
 AtomicBool
+AtomicU64
 AtomicUsize
 BadCharOnWindows
 BaseDirs
@@ -51,6 +52,7 @@ ClientCertVerified
 ClientCertVerifier
 ClientConfig
 ClientHello
+CloseFile
 CloseHandle
 CollapsingHeader
 Color32Image
@@ -76,6 +78,7 @@ DefaultGuard
 DeleteCommand
 DeleteProject
 DeserializeOwned
+DiffTag
 DigitallySignedStruct
 DiscoveryEvent
 DismissPairing
@@ -95,9 +98,12 @@ ExchangeCommands
 ExecutionPolicy
 ExtendedColorType
 FakeBackend
+FileAsk
 FileDialog
 FileHeader
+FilePart
 FileTime
+FileView
 FilterType
 FixedPicker
 FnMut
@@ -156,6 +162,8 @@ MakeSymlink
 mDNS
 MetadataExt
 MiB
+MouseWheel
+MouseWheelUnit
 MutexGuard
 NameProblem
 NativeOptions
@@ -174,6 +182,7 @@ NSBonjourServices
 NSHighResolutionCapable
 NSLocalNetworkUsageDescription
 NSPrincipalClass
+OpenFile
 OpenLogFolder
 OpenOptions
 OpenOptionsExt
@@ -195,6 +204,7 @@ PairSlot
 PairStarted
 PairState
 ParentDir
+PartError
 PartialEq
 PathBuf
 PeerFolder
@@ -204,6 +214,7 @@ PendingFile
 PermissionsExt
 PkgInfo
 PNGs
+PointerMoved
 PointingHand
 PowerShell
 PreCommit
@@ -221,6 +232,9 @@ PSScriptRoot
 PullOrPush
 PushState
 PutFile
+RawInput
+ReadFile
+ReadSomethingNew
 RectShape
 RemoteFolder
 RemoteProject
@@ -238,6 +252,7 @@ RollingFileAppender
 RunCommand
 RunStatus
 RwLock
+SameContent
 SCDynamicStoreCopyComputerName
 ScrollArea
 ScrollBar
@@ -296,16 +311,19 @@ TextWrapMode
 TextWrapping
 ThemeChoice
 ThemePreference
+TimedOut
 TimestampOnly
 TlsAcceptor
 TLSConfig
 TlsConnector
+TouchPhase
 TrailingDotOrSpace
 TransferKind
 TransferRecord
 TransferRequest
 TransferState
 TypeRef
+UiBuilder
 UiState
 UnboundedReceiver
 UnboundedSender
