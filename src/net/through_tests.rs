@@ -21,6 +21,7 @@ fn relay_over(stream: DuplexStream) -> Connection {
         peer_id: uuid::Uuid::new_v4(),
         peer_name: "Studio".into(),
         peer_fingerprint: "ab".repeat(32),
+        peer_os: None,
         scanned_ms: None,
     }
 }

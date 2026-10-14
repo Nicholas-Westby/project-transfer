@@ -2,7 +2,7 @@
 
 use super::{Ctx, SessionState, refused};
 use crate::logging::one_line;
-use crate::model::{Direction, FolderId, Project, ProjectId};
+use crate::model::{Direction, FolderId, Os, Project, ProjectId};
 use crate::net::NetEvent;
 use crate::protocol::{Request, Response};
 use crate::transfer::home::resolve_all;
@@ -262,7 +262,10 @@ pub async fn put_file<S: AsyncRead + Unpin>(
         }
     }
     if let Some(p) = pending {
-        match p.finish(file.mtime_ms, file.exec) {
+        // Windows keeps no executable bit, so a file from it keeps the one
+        // the copy here has.
+        let exec = (state.peer_os != Some(Os::Windows)).then_some(file.exec);
+        match p.finish(file.mtime_ms, exec) {
             Ok(()) => {
                 if let Some(push) = &mut state.push {
                     push.files += 1;

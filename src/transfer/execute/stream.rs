@@ -3,7 +3,7 @@
 use super::window::{Awaiting, Counts};
 use super::{CANCELLED, Run, Side};
 use crate::manifest::{is_exec, mtime_ms};
-use crate::model::{FolderId, ProjectId};
+use crate::model::{FolderId, Os, ProjectId};
 use crate::protocol::{Request, Response};
 use crate::transfer::prepare::unexpected;
 use crate::transfer::{Applier, Progress, safe_join};
@@ -162,6 +162,9 @@ impl Run<'_> {
             self.tick(rel, false);
         }
         if let Some(p) = pending {
+            // Windows keeps no executable bit, so a file from it keeps the
+            // one the copy here has.
+            let exec = (self.conn.peer_os() != Some(Os::Windows)).then_some(exec);
             match p.finish(mtime_ms, exec) {
                 Ok(()) => {
                     self.summary.files += 1;

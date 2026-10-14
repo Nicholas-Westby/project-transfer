@@ -21,7 +21,7 @@ fn finished_file_has_content_mtime_and_no_temp() {
     let mut p = a.begin_file("deep/er/f.txt").unwrap();
     p.write(b"hello ").unwrap();
     p.write(b"world").unwrap();
-    p.finish(1_600_000_000_123, false).unwrap();
+    p.finish(1_600_000_000_123, Some(false)).unwrap();
     let f = t.path().join("deep/er/f.txt");
     assert_eq!(std::fs::read(&f).unwrap(), b"hello world");
     assert_eq!(mtime(&f), 1_600_000_000_123);
@@ -30,15 +30,21 @@ fn finished_file_has_content_mtime_and_no_temp() {
 
 #[cfg(unix)]
 #[test]
-fn exec_flag_is_set_and_cleared() {
+fn exec_flag_is_set_cleared_or_kept() {
     use std::os::unix::fs::PermissionsExt;
     let t = tempfile::tempdir().unwrap();
     let a = Applier::new(t.path().to_path_buf());
-    let mode = |p: &Path| std::fs::metadata(p).unwrap().permissions().mode();
-    a.begin_file("run.sh").unwrap().finish(1000, true).unwrap();
-    assert_ne!(mode(&t.path().join("run.sh")) & 0o100, 0);
-    a.begin_file("run.sh").unwrap().finish(1000, false).unwrap();
-    assert_eq!(mode(&t.path().join("run.sh")) & 0o111, 0);
+    let put = |rel: &str, exec: Option<bool>| {
+        a.begin_file(rel).unwrap().finish(1000, exec).unwrap();
+        let m = std::fs::metadata(t.path().join(rel)).unwrap();
+        m.permissions().mode() & 0o111 != 0
+    };
+    assert!(put("run.sh", Some(true)));
+    // None stands for a sender that can't say: the file keeps what it had.
+    assert!(put("run.sh", None));
+    assert!(!put("run.sh", Some(false)));
+    assert!(!put("run.sh", None));
+    assert!(!put("new.sh", None), "a file new here gets no bit");
 }
 
 #[test]
@@ -74,7 +80,7 @@ fn finish_replaces_a_directory_in_the_way() {
     let a = Applier::new(t.path().to_path_buf());
     let mut p = a.begin_file("x").unwrap();
     p.write(b"file").unwrap();
-    p.finish(1000, false).unwrap();
+    p.finish(1000, Some(false)).unwrap();
     assert_eq!(std::fs::read(t.path().join("x")).unwrap(), b"file");
 }
 
@@ -149,7 +155,7 @@ fn removing_another_spelling_of_a_file_just_written_keeps_it() {
     std::fs::write(t.path().join("soldu\u{301}.jpg"), "old").unwrap();
     let mut p = a.begin_file("sold\u{fa}.jpg").unwrap();
     p.write(b"new").unwrap();
-    p.finish(0, false).unwrap();
+    p.finish(0, Some(false)).unwrap();
     a.remove("soldu\u{301}.jpg", false).unwrap();
     assert_eq!(names(t.path()).len(), 1, "{:?}", names(t.path()));
     let kept = std::fs::read_to_string(t.path().join("sold\u{fa}.jpg"));
@@ -165,7 +171,7 @@ fn removing_another_spelling_of_a_folder_just_made_keeps_its_files() {
     a.make_dir("Caf\u{e9}").unwrap();
     let mut p = a.begin_file("Caf\u{e9}/menu.md").unwrap();
     p.write(b"soup").unwrap();
-    p.finish(0, false).unwrap();
+    p.finish(0, Some(false)).unwrap();
     a.remove("Cafe\u{301}", true).unwrap();
     let kept = std::fs::read_to_string(t.path().join("Caf\u{e9}/menu.md"));
     assert_eq!(kept.unwrap(), "soup");
@@ -295,7 +301,7 @@ fn read_only_files_are_replaced_and_removed_on_windows() {
     }
     let mut f = a.begin_file("kept.txt").unwrap();
     f.write(b"new").unwrap();
-    f.finish(0, false).unwrap();
+    f.finish(0, Some(false)).unwrap();
     assert_eq!(
         std::fs::read_to_string(dir.path().join("kept.txt")).unwrap(),
         "new"

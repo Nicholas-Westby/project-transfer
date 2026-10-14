@@ -4,7 +4,7 @@
 use super::Shared;
 use super::handshake::{Via, handshake};
 use crate::address::is_local;
-use crate::model::{InstanceId, Peer};
+use crate::model::{InstanceId, Os, Peer};
 use crate::protocol::{Request, Response, read_msg, write_msg};
 use anyhow::{Context, anyhow, bail};
 use std::net::SocketAddr;
@@ -70,6 +70,8 @@ pub struct Connection {
     pub(super) peer_id: InstanceId,
     pub(super) peer_name: String,
     pub(super) peer_fingerprint: String,
+    /// What the other computer runs, once one of its folder scans said.
+    pub(super) peer_os: Option<Os>,
     /// When the first folder scan was asked for over this connection.
     pub(super) scanned_ms: Option<i64>,
 }
@@ -213,6 +215,10 @@ impl Connection {
         &self.peer_name
     }
 
+    pub fn peer_os(&self) -> Option<Os> {
+        self.peer_os
+    }
+
     pub fn scanned_ms(&self) -> Option<i64> {
         self.scanned_ms
     }
@@ -221,6 +227,10 @@ impl Connection {
     pub fn mark_scanned(&mut self) {
         self.scanned_ms
             .get_or_insert_with(crate::transfer::projects::now_ms);
+    }
+
+    pub fn set_peer_os(&mut self, os: Os) {
+        self.peer_os = Some(os);
     }
 
     pub async fn request(&mut self, req: &Request) -> anyhow::Result<Response> {

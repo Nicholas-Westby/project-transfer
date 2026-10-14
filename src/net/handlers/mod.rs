@@ -35,6 +35,9 @@ pub struct SessionState {
     /// Folders this connection scanned, so `Hashes` reads the same place
     /// even for a folder this computer has not set up yet.
     roots: HashMap<(ProjectId, FolderId), PathBuf>,
+    /// What the asking computer runs, as it said when it asked for a folder
+    /// scan; older versions don't say.
+    peer_os: Option<Os>,
     /// When this computer first scanned a folder for this connection.
     scanned_ms: Option<i64>,
     push: Option<push::PushState>,
@@ -210,6 +213,7 @@ async fn manifest(
         if set_up { "" } else { ", not set up here yet" }
     );
     state.roots.insert((project, folder), root.clone());
+    state.peer_os = from_os;
     Response::Manifest(FolderScan {
         manifest,
         path: root.display().to_string(),

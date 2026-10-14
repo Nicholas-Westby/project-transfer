@@ -86,6 +86,7 @@ impl Ctx<'_> {
         };
         match self.conn.request(&req).await? {
             Response::Manifest(mut s) => {
+                self.conn.set_peer_os(s.os);
                 exec_between(&mut s.manifest, Os::current(), s.os);
                 Ok(s)
             }

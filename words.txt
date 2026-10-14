@@ -24,7 +24,6 @@
 09b-computers-through
 0f32
 0o000
-0o100
 0o111
 0o444
 0o600
@@ -2711,6 +2710,7 @@ rt
 rule
 rules
 run
+runnable
 runner
 running
 runs

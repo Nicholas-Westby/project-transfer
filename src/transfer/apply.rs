@@ -1,6 +1,7 @@
 //! Writes a mirror to disk without ever leaving a half-written file.
 
 use super::paths::{invalid, safe_join};
+use crate::manifest::is_exec;
 use std::collections::HashSet;
 use std::fs::File;
 use std::io::{self, Write};
@@ -258,12 +259,17 @@ impl PendingFile {
         }
     }
 
-    pub fn finish(mut self, mtime_ms: i64, exec: bool) -> io::Result<()> {
+    /// `exec` None keeps the bit of the file this one replaces, for a sender
+    /// that can't say whether it runs; a file new here gets none.
+    pub fn finish(mut self, mtime_ms: i64, exec: Option<bool>) -> io::Result<()> {
         let file = self
             .file
             .take()
             .ok_or_else(|| io::Error::other("the file was already finished"))?;
         file.sync_all()?;
+        let exec = exec.unwrap_or_else(|| {
+            std::fs::symlink_metadata(&self.dest).is_ok_and(|m| m.is_file() && is_exec(&m))
+        });
         set_exec(&file, exec)?;
         drop(file);
         // Set after closing so no later write can move it.

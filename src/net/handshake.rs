@@ -100,6 +100,7 @@ pub(super) async fn handshake<IO: Io + 'static>(
         peer_id,
         peer_name,
         peer_fingerprint,
+        peer_os: None,
         scanned_ms: None,
     })
 }
