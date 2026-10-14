@@ -33,7 +33,9 @@ image.
 `TLS`), is a phrase: `phrases.txt` lists it as written, `words.txt` lists
 its parts (`activity` and `kind`), and `phrase-changes.txt` shows the
 phrases a commit added or removed. A key or other random-looking phrase
-adds no parts. A word that is also a phrase in lower case, such as
+adds no parts. An IP address, such as `10.0.0.5` or `fe80::1`, is a phrase
+too and adds no parts, so a commit that adds one shows it in
+`phrase-changes.txt`. A word that is also a phrase in lower case, such as
 `coolthings` next to `CoolThings`, is listed only as the phrase. The
 pre-commit hook refreshes the lists, reading what is staged, so a commit's
 diff shows its new and dropped terms in two short files. Run

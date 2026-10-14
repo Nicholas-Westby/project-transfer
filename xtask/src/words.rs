@@ -2,11 +2,12 @@
 //! `phrases.txt`. A word is letters and digits with at least one letter
 //! (`player1`, `blake3`, `4b96`), joined by single hyphens (`one-time`).
 //! Words are lowercased so `Result` and `result` are one entry. A word that
-//! mixes cases, such as `ActivityKind`, is a phrase (see `phrases.rs`).
+//! mixes cases, such as `ActivityKind`, is a phrase (see `phrases.rs`), and
+//! so is an IP address (see `addresses.rs`).
 //! Hashes, keys and other random-looking strings are kept on purpose:
 //! spotting a committed secret is one reason for the lists.
 
-use crate::phrases;
+use crate::{addresses, phrases};
 use std::collections::BTreeSet;
 
 /// The characters a word is made of. Anything else ends it.
@@ -30,7 +31,8 @@ impl Found {
     /// where `\n` in `"a\nb"` is a line break, not part of the word `nb`.
     pub fn read(&mut self, text: &str, escapes: bool) {
         let mut run = String::new();
-        let chars: Vec<char> = text.chars().collect();
+        let mut chars: Vec<char> = text.chars().collect();
+        self.phrases.extend(addresses::take(&mut chars));
         // Inside a Rust raw string, `r#"..."#`, with its number of `#`s.
         // Backslashes there are plain, as in `r"C:\Users"`.
         let mut raw: Option<usize> = None;
@@ -216,6 +218,13 @@ mod tests {
         let (words, phrases) = read("aB3xQ9zK sk-proj-Xy7Qa9Lm aBxQzK iOS", true);
         assert_eq!(words, Vec::<String>::new());
         assert_eq!(phrases, ["aB3xQ9zK", "aBxQzK", "iOS", "sk-proj-Xy7Qa9Lm"]);
+    }
+
+    #[test]
+    fn lists_ip_addresses_whole_as_phrases() {
+        let (words, phrases) = read("dial fe80::1 or 10.20.30.1:47820", false);
+        assert_eq!(words, ["dial", "or"]);
+        assert_eq!(phrases, ["10.20.30.1", "fe80::1"]);
     }
 
     #[test]

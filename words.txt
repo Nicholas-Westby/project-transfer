@@ -70,7 +70,6 @@
 0xffc0
 0xffffff
 10-pair-setup
-10ca
 11-pair-confirm
 11ab
 11b-pair-waiting
@@ -107,9 +106,9 @@
 23-folder-menu
 23b-change-folder-on-peer
 255-byte
-2f7a
 2x
 37e
+4a
 4b96
 512x512
 585a
@@ -118,12 +117,9 @@
 64u32
 65e5
 672c
-73da
 7d8b6c1e-2f4a-4b5c-9d6e-0f1a2b3c4d5e
 7u8
-86f1
 8a9e
-9d4c
 a
 a's
 a1
@@ -343,11 +339,10 @@ axis
 b
 b's
 b0
-b09c
 b1
 b3x
-b94d
 ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad
+babe
 back
 backdrop
 backend
@@ -416,6 +411,7 @@ black
 blake3
 blamed
 blank
+blanks
 blink
 blob
 block
@@ -535,6 +531,7 @@ cat-file
 catalog
 catch
 catches
+catching
 caught
 cause
 cc
@@ -1184,16 +1181,9 @@ fast
 fatal
 fbfd86e
 fc
-fc00
-fc9e
 fd00
-fd12
-fdb3
-fe80
 features
-febf
 february
-fec0
 feed
 feff
 ferret
@@ -2244,6 +2234,7 @@ people
 per
 per-connection
 per-user
+perhaps
 permission
 permissions
 permit
@@ -2947,6 +2938,7 @@ soldu
 solid
 some
 someone
+someone's
 something
 somewhere
 soon

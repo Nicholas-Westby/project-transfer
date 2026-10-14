@@ -1,6 +1,7 @@
 //! Project tooling: `cargo xtask install`, `icon`, `screenshot`,
 //! `bump-version`, `words`, `pre-commit` and `hooks`.
 
+mod addresses;
 mod icon;
 mod mac;
 mod phrases;
