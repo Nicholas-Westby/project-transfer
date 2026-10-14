@@ -210,7 +210,7 @@ impl Look<'_> {
         let there = (remote.set_up && remote.exists).then_some(&remote.manifest);
         let compose = compose_for(remote.os);
         let here = match &f.here {
-            Some(root) => Some(ctx.local_scan(root.clone(), compose).await?),
+            Some(root) => Some(ctx.local_scan(root.clone(), remote.os).await?),
             None => None,
         };
         let mut same = HashSet::new();

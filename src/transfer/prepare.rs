@@ -5,7 +5,6 @@ use super::projects::{check_names_for, default_path};
 use super::scans::{Ask, Ctx, Scans, Sides};
 use super::{home, link};
 use crate::ignore_rules::{IgnoreSpec, Matcher};
-use crate::manifest::compose_for;
 use crate::model::{Direction, FolderId, Os, Project, ProjectId};
 use crate::net::{Connection, Shared};
 use crate::protocol::{ProjectSummary, Request, Response};
@@ -146,7 +145,7 @@ pub(super) async fn prepare_with(
                 if !remote.set_up && remote.exists && !remote.manifest.entries.is_empty() {
                     ctx.warnings.push(unclaimed(&remote.path, &peer));
                 }
-                let mine = ctx.local_scan(root.clone(), compose_for(remote.os)).await?;
+                let mine = ctx.local_scan(root.clone(), remote.os).await?;
                 let side = Sides {
                     folder: f.id,
                     name: f.name.clone(),
@@ -218,7 +217,7 @@ pub(super) async fn prepare_with(
                         }
                     },
                 };
-                let mine = ctx.local_scan(dest.clone(), compose_for(remote.os)).await?;
+                let mine = ctx.local_scan(dest.clone(), remote.os).await?;
                 let set_up = known.is_some_and(|f| f.local_path.is_some());
                 if !set_up && dest.is_dir() && !mine.entries.is_empty() {
                     ctx.warnings

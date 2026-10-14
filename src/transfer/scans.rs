@@ -6,7 +6,7 @@ use super::prepare::unexpected;
 use super::preview::{FolderPreview, LeftOut, Replaced, drop_unholdable, replaced_folders};
 use super::safe_join;
 use crate::ignore_rules::{IgnoreSpec, Matcher};
-use crate::manifest::{Manifest, compare, hash_file, resolve_hashes, scan};
+use crate::manifest::{Kind, Manifest, compare, compose_for, hash_file, resolve_hashes, scan};
 use crate::model::{FolderId, Os, ProjectId};
 use crate::net::Connection;
 use crate::protocol::{FolderScan, Request, Response};
@@ -85,24 +85,33 @@ impl Ctx<'_> {
             home_hint: ask.hint,
         };
         match self.conn.request(&req).await? {
-            Response::Manifest(s) => Ok(s),
+            Response::Manifest(mut s) => {
+                exec_between(&mut s.manifest, Os::current(), s.os);
+                Ok(s)
+            }
             other => Err(unexpected(self.conn, "the folder scan", other)),
         }
     }
 
+    /// This computer's copy of a folder, to compare with the other
+    /// computer's, which runs `other`.
     pub(super) async fn local_scan(
         &mut self,
         root: PathBuf,
-        compose: bool,
+        other: Os,
     ) -> anyhow::Result<Manifest> {
+        let compose = compose_for(other);
         if let Some(m) = self.scans.local.remove(&(root.clone(), compose)) {
             return Ok(m);
         }
         let spec = self.spec.clone();
         let shown = root.display().to_string();
-        tokio::task::spawn_blocking(move || scan(&root, &Matcher::new(&spec)?, compose))
-            .await?
-            .with_context(|| format!("Could not read {shown}"))
+        let mut m =
+            tokio::task::spawn_blocking(move || scan(&root, &Matcher::new(&spec)?, compose))
+                .await?
+                .with_context(|| format!("Could not read {shown}"))?;
+        exec_between(&mut m, Os::current(), other);
+        Ok(m)
     }
 
     async fn remote_hashes(
@@ -176,6 +185,19 @@ impl Ctx<'_> {
     }
 }
 
+/// Windows keeps no executable bit, so its scans say no file runs. Next to
+/// one, every script on a Mac would look changed on every transfer and
+/// count for Sync, so when either computer runs Windows `m` loses the bit.
+fn exec_between(m: &mut Manifest, a: Os, b: Os) {
+    if a == Os::Windows || b == Os::Windows {
+        for e in &mut m.entries {
+            if let Kind::File { exec, .. } = &mut e.kind {
+                *exec = false;
+            }
+        }
+    }
+}
+
 async fn local_hashes(root: PathBuf, paths: Vec<String>) -> HashMap<String, String> {
     tokio::task::spawn_blocking(move || {
         paths
@@ -192,4 +214,36 @@ async fn local_hashes(root: PathBuf, paths: Vec<String>) -> HashMap<String, Stri
     })
     .await
     .unwrap_or_default()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::manifest::Entry;
+
+    fn script(exec: bool) -> Manifest {
+        let kind = Kind::File {
+            size: 4,
+            mtime_ms: 7,
+            exec,
+        };
+        Manifest {
+            entries: vec![Entry {
+                rel: "install".into(),
+                kind,
+            }],
+            ignored_in_dir: Default::default(),
+        }
+    }
+
+    #[test]
+    fn a_script_is_unchanged_next_to_a_copy_on_windows() {
+        let (mut mac, mut pc) = (script(true), script(false));
+        exec_between(&mut mac, Os::MacOs, Os::MacOs);
+        assert_eq!(compare(&mac, &pc).changes.len(), 1, "two Macs keep the bit");
+        for m in [&mut mac, &mut pc] {
+            exec_between(m, Os::MacOs, Os::Windows);
+        }
+        assert!(compare(&mac, &pc).changes.is_empty());
+    }
 }
