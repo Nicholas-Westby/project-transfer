@@ -4,13 +4,12 @@
 //! peer's per-connection scan state matches what the user confirmed. If it
 //! drops while the preview is open, running fails and asks for a new preview.
 
-use super::pairing::files_word;
 use super::progress;
 use super::state::TransferState;
+use super::transfer_words::{done_sentence, verb};
 use super::{Core, lock};
-use crate::model::Direction;
 use crate::net::Connection;
-use crate::transfer::{self, Preview, Summary, TransferRequest};
+use crate::transfer::{self, Preview, TransferRequest};
 use anyhow::bail;
 use std::time::Instant;
 use tokio_util::sync::CancellationToken;
@@ -21,10 +20,11 @@ use tokio_util::sync::CancellationToken;
 pub(super) struct Slot<C = Connection> {
     /// Bumped whenever the UI moves on, so late results are dropped.
     generation: u64,
-    /// The latest request as the user made it, for comparing again. A
-    /// matched project's preview names the other computer's id, which this
-    /// computer only takes on when the transfer runs.
-    asked: Option<TransferRequest>,
+    /// The latest request as the user made it, and whether it was a sync,
+    /// for comparing again. A matched project's preview names the other
+    /// computer's id, which this computer only takes on when the transfer
+    /// runs.
+    asked: Option<(TransferRequest, bool)>,
     ready: Option<(C, Preview)>,
     cancel: Option<CancellationToken>,
 }
@@ -73,14 +73,22 @@ impl Core {
         )
     }
 
-    pub(super) fn prepare(&self, req: TransferRequest) -> anyhow::Result<()> {
+    /// A sync looks at both sides first and previews whichever direction
+    /// it picks; `req.direction` is then ignored.
+    pub(super) fn prepare(&self, req: TransferRequest, sync: bool) -> anyhow::Result<()> {
         if self.busy() {
             bail!(BUSY);
         }
+        // The way the open sync preview went, so comparing it again can say
+        // when it turns around.
+        let shown = match &self.ui.lock().transfer {
+            TransferState::Ready(p) if sync && p.sync.is_some() => Some(p.request.direction),
+            _ => None,
+        };
         let generation = {
             let mut slot = lock(&self.transfer);
             let g = slot.reset();
-            slot.asked = Some(req.clone());
+            slot.asked = Some((req.clone(), sync));
             self.ui.update(|s| s.transfer = TransferState::Preparing);
             g
         };
@@ -88,7 +96,18 @@ impl Core {
         tokio::spawn(async move {
             let result = async {
                 let mut conn = core.connect(req.peer).await?;
-                let preview = transfer::prepare(&mut conn, &core.shared, req.clone()).await?;
+                let preview = if sync {
+                    let (mut p, choice) =
+                        transfer::prepare_sync(&mut conn, &core.shared, req.clone()).await?;
+                    // With nothing to do, neither way moves anything.
+                    if shown.is_some_and(|d| d != choice.direction) && !p.is_empty() {
+                        p.warnings.insert(0, choice.turned_around());
+                    }
+                    p.sync = Some(choice);
+                    p
+                } else {
+                    transfer::prepare(&mut conn, &core.shared, req.clone()).await?
+                };
                 anyhow::Ok((conn, preview))
             }
             .await;
@@ -106,7 +125,11 @@ impl Core {
                 }
                 Err(e) => {
                     let why = format!("{e:#}");
-                    let verb = verb(req.direction, false);
+                    let verb = if sync {
+                        "sync"
+                    } else {
+                        verb(req.direction, false)
+                    };
                     core.ui
                         .error(format!("Could not prepare the {verb}: {why}"));
                     core.ui.update(|s| s.transfer = TransferState::Failed(why));
@@ -123,7 +146,7 @@ impl Core {
             return Ok(());
         }
         let asked = lock(&self.transfer).asked.clone();
-        asked.map_or(Ok(()), |req| self.prepare(req))
+        asked.map_or(Ok(()), |(req, sync)| self.prepare(req, sync))
     }
 
     pub(super) fn execute(&self) -> anyhow::Result<()> {
@@ -225,86 +248,6 @@ impl Core {
     }
 }
 
-fn verb(d: Direction, past: bool) -> &'static str {
-    match (d, past) {
-        (Direction::Push, false) => "push",
-        (Direction::Pull, false) => "pull",
-        (Direction::Push, true) => "Pushed",
-        (Direction::Pull, true) => "Pulled",
-    }
-}
-
-/// "Pushed 42 files to Desktop Swift Heron in 3.1 s."
-pub(super) fn done_sentence(d: Direction, peer: &str, s: &Summary) -> String {
-    let dir = match d {
-        Direction::Push => "to",
-        Direction::Pull => "from",
-    };
-    let mut text = format!(
-        "{} {} {dir} {peer} in {}.",
-        verb(d, true),
-        files_word(s.files),
-        crate::units::took(std::time::Duration::from_millis(s.took_ms))
-    );
-    if s.removed > 0 {
-        text.push_str(&format!(
-            " Removed {}.",
-            match s.removed {
-                1 => "1 item".to_string(),
-                n => format!("{n} items"),
-            }
-        ));
-    }
-    if !s.failures.is_empty() {
-        text.push_str(&format!(
-            " {} could not be copied; open the log folder in Settings to see why.",
-            s.failures.len()
-        ));
-    }
-    text
-}
-
 #[cfg(test)]
-mod tests {
-    use super::*;
-    use crate::model::Direction;
-
-    fn preview(tag: u128) -> Preview {
-        Preview {
-            request: TransferRequest {
-                peer: uuid::Uuid::from_u128(tag),
-                project: uuid::Uuid::from_u128(tag),
-                direction: Direction::Push,
-                send_everything: false,
-            },
-            folders: Vec::new(),
-            left_out: Vec::new(),
-            warnings: Vec::new(),
-            link: None,
-            description: false,
-        }
-    }
-
-    #[test]
-    fn a_stale_preview_is_dropped_and_never_paired_with_a_newer_connection() {
-        let mut slot: Slot<&str> = Slot::default();
-        let first = slot.reset();
-        // Dismissed, then a second prepare starts before the first finishes.
-        let second = slot.reset();
-        assert!(slot.offer(second, "conn B", preview(2)));
-        assert!(!slot.offer(first, "conn A", preview(1)));
-        let (conn, p) = slot.take_ready().unwrap();
-        assert_eq!((conn, p), ("conn B", preview(2)));
-        assert!(slot.take_ready().is_none(), "a preview runs at most once");
-    }
-
-    #[test]
-    fn dismissing_forgets_the_ready_preview() {
-        let mut slot: Slot<&str> = Slot::default();
-        let g = slot.reset();
-        assert!(slot.offer(g, "conn", preview(1)));
-        slot.reset();
-        assert!(slot.take_ready().is_none());
-        assert!(!slot.offer(g, "late", preview(1)));
-    }
-}
+#[path = "transfers_tests.rs"]
+mod tests;

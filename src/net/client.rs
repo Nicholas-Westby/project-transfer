@@ -70,6 +70,8 @@ pub struct Connection {
     pub(super) peer_id: InstanceId,
     pub(super) peer_name: String,
     pub(super) peer_fingerprint: String,
+    /// When the first folder scan was asked for over this connection.
+    pub(super) scanned_ms: Option<i64>,
 }
 
 impl Connection {
@@ -209,6 +211,16 @@ impl Connection {
 
     pub fn peer_name(&self) -> &str {
         &self.peer_name
+    }
+
+    pub fn scanned_ms(&self) -> Option<i64> {
+        self.scanned_ms
+    }
+
+    /// Notes that a folder scan is about to be asked for; the first counts.
+    pub fn mark_scanned(&mut self) {
+        self.scanned_ms
+            .get_or_insert_with(crate::transfer::projects::now_ms);
     }
 
     pub async fn request(&mut self, req: &Request) -> anyhow::Result<Response> {

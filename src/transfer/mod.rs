@@ -10,6 +10,9 @@ mod paths;
 mod prepare;
 mod preview;
 pub mod projects;
+mod scans;
+pub mod sync;
+pub mod sync_count;
 
 pub use apply::{Applier, PendingFile};
 pub use details::{Synced, set_peer_folder_path, sync_details};
@@ -21,6 +24,7 @@ pub use preview::{
     Counts, FolderPreview, LeftOut, Preview, Replaced, TransferRequest, drop_unholdable,
     replaced_folders,
 };
+pub use sync::prepare_sync;
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum Progress {

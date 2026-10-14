@@ -1,15 +1,17 @@
-//! Pull and Push, each with the one-line reason when it cannot run.
+//! Pull, Sync and Push, each with the one-line reason when it cannot run.
 
 use super::theme::Palette;
 use super::widgets;
 use super::{App, Confirm};
 use crate::core::{Action, TransferState, UiState};
-use crate::model::{Direction, Project};
+use crate::model::{Direction, Project, ProjectId, TransferKind};
 use crate::transfer::TransferRequest;
-use egui::{RichText, Ui};
+use egui::{RichText, TextWrapMode, Ui};
 
 const SYNC_HELP: &str =
     "Sends this project's folders, description and commands. No files are copied.";
+const SYNC_TRANSFER_HELP: &str = "Pushes or pulls, whichever way has more files with newer \
+     changes. The preview says which before anything moves.";
 
 /// Why a push or pull can't start right now, or None when it can.
 pub fn blocked(s: &UiState, p: &Project, dir: Direction) -> Option<String> {
@@ -18,6 +20,35 @@ pub fn blocked(s: &UiState, p: &Project, dir: Direction) -> Option<String> {
         (dir == Direction::Push && none_here)
             .then(|| "None of this project's folders are on this computer yet.".into())
     })
+}
+
+/// Why Sync can't start right now. It may go either way, so it needs what
+/// a push and a pull both need from the peer; a project with no folder
+/// here can still sync, by pulling.
+pub fn sync_transfer_blocked(s: &UiState) -> Option<String> {
+    let needs = ", which syncing needs";
+    let push = peer_blocked(s, Direction::Push, needs);
+    let pull = peer_blocked(s, Direction::Pull, needs);
+    // Every other reason reads the same both ways, so two different ones
+    // are the two permissions: say both at once.
+    if let (Some(a), Some(b), Some(name)) = (&push, &pull, super::peer_name(s))
+        && a != b
+    {
+        return Some(format!(
+            "{name} doesn't allow pushes from or pulls to this computer, which syncing needs. \
+             Allow both on {name}."
+        ));
+    }
+    push.or(pull)
+}
+
+/// Why the button for `kind` can't start right now, or None when it can.
+pub fn blocked_kind(s: &UiState, p: &Project, kind: TransferKind) -> Option<String> {
+    match kind {
+        TransferKind::Push => blocked(s, p, Direction::Push),
+        TransferKind::Pull => blocked(s, p, Direction::Pull),
+        TransferKind::Sync => sync_transfer_blocked(s),
+    }
 }
 
 /// Why "Sync details" can't run right now. It needs what a push needs from
@@ -61,34 +92,35 @@ impl App {
         let pal = Palette::of(ui.ctx());
         let peer = super::peer_name(s).unwrap_or_else(|| "the other computer".into());
         let mut start = None;
-        let reasons = [
-            blocked(s, p, Direction::Push),
-            blocked(s, p, Direction::Pull),
-        ];
-        // One shared reason reads once, under both buttons.
-        let shared = reasons[0].is_some() && reasons[0] == reasons[1];
-        ui.columns(2, |cols| {
-            for (ui, dir) in cols.iter_mut().zip([Direction::Pull, Direction::Push]) {
-                let reason = reasons[dir as usize].clone();
-                let label = match dir {
-                    Direction::Push => format!("Push to {peer}"),
-                    Direction::Pull => format!("Pull from {peer}"),
+        let kinds = [TransferKind::Pull, TransferKind::Sync, TransferKind::Push];
+        let reasons = kinds.map(|k| blocked_kind(s, p, k));
+        // One shared reason reads once, under all three buttons.
+        let shared = reasons[0].is_some() && reasons.iter().all(|r| *r == reasons[0]);
+        ui.columns(3, |cols| {
+            for ((ui, kind), reason) in cols.iter_mut().zip(kinds).zip(&reasons) {
+                let label = match kind {
+                    TransferKind::Pull => format!("Pull from {peer}"),
+                    TransferKind::Sync => format!("Sync with {peer}"),
+                    TransferKind::Push => format!("Push to {peer}"),
                 };
                 ui.vertical(|ui| {
                     let r = ui
                         .add_enabled_ui(reason.is_none(), |ui| {
                             widgets::with_fill(ui, pal.route, |ui| {
-                                ui.add_sized(
-                                    [ui.available_width(), 36.0],
-                                    egui::Button::new(
-                                        RichText::new(&label).color(pal.on_fill()).strong(),
-                                    ),
-                                )
+                                let text = RichText::new(&label).color(pal.on_fill()).strong();
+                                // Three to a row: a long name gives way.
+                                let button =
+                                    egui::Button::new(text).wrap_mode(TextWrapMode::Truncate);
+                                ui.add_sized([ui.available_width(), 36.0], button)
                             })
                         })
                         .inner;
+                    let r = match kind {
+                        TransferKind::Sync => r.on_hover_text(SYNC_TRANSFER_HELP),
+                        _ => r,
+                    };
                     if r.clicked() {
-                        start = Some(dir);
+                        start = Some(kind);
                     }
                     if let Some(why) = reason.as_ref().filter(|_| !shared) {
                         ui.add(
@@ -101,18 +133,8 @@ impl App {
         if shared && let Some(why) = &reasons[0] {
             ui.label(RichText::new(why).small().color(pal.muted()));
         }
-        if let Some(dir) = start
-            && let Some(peer) = s.selected_peer
-        {
-            let req = TransferRequest {
-                peer,
-                project: p.id,
-                direction: dir,
-                send_everything: self.view.send_everything,
-            };
-            self.view.last_request = Some(req.clone());
-            self.act(Action::Prepare(req));
-            self.view.send_everything = false;
+        if let Some(kind) = start {
+            self.start_transfer(s, p.id, kind);
         }
         ui.add_space(6.0);
         ui.horizontal(|ui| {
@@ -135,6 +157,31 @@ impl App {
         });
         ui.add_space(8.0);
         self.sync_row(ui, s, p, &peer);
+    }
+
+    /// Starts what the button for `kind` starts: the preview of a push or
+    /// pull, or the look at both sides a sync takes first.
+    pub(super) fn start_transfer(&mut self, s: &UiState, project: ProjectId, kind: TransferKind) {
+        let Some(peer) = s.selected_peer else {
+            return;
+        };
+        let direction = match kind {
+            TransferKind::Pull => Direction::Pull,
+            // A sync's own direction is decided by the comparison.
+            TransferKind::Push | TransferKind::Sync => Direction::Push,
+        };
+        let req = TransferRequest {
+            peer,
+            project,
+            direction,
+            send_everything: self.view.send_everything,
+        };
+        self.view.last_request = Some(req.clone());
+        self.act(match kind {
+            TransferKind::Sync => Action::PrepareSync(req),
+            TransferKind::Push | TransferKind::Pull => Action::Prepare(req),
+        });
+        self.view.send_everything = false;
     }
 
     /// A plain button below the filled ones: sending details is a smaller

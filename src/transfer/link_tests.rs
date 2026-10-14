@@ -35,6 +35,7 @@ fn info(p: &Project) -> RemoteProject {
         name: p.name.clone(),
         primary: p.primary,
         description: Default::default(),
+        last_with_you: false,
         folders: p
             .folders
             .iter()

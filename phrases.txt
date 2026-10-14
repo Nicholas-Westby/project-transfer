@@ -207,6 +207,7 @@ PNGs
 PointingHand
 PowerShell
 PreCommit
+PrepareSync
 PrivateKeyDer
 PrivatePkcs8KeyDer
 ProgressBar
@@ -276,6 +277,7 @@ StdRng
 StopCommand
 SubscriberExt
 SubscriberInitExt
+SyncChoice
 SyncDetails
 SyncProject
 SystemTime
@@ -299,6 +301,7 @@ TlsAcceptor
 TLSConfig
 TlsConnector
 TrailingDotOrSpace
+TransferKind
 TransferRecord
 TransferRequest
 TransferState

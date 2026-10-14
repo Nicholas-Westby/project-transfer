@@ -49,11 +49,14 @@ async fn first_push_creates_everything_including_empty_dirs() {
         (rec.peer, rec.direction, rec.files),
         (a.id().await, Direction::Push, 2)
     );
+    // Each side notes when it read its folder, before the files moved.
+    assert!(rec.scanned_ms.is_some_and(|t| t <= rec.at_ms));
     let rec = a.project(p.id).await.unwrap().last_transfer.unwrap();
     assert_eq!(
         (rec.peer, rec.direction, rec.files),
         (b.id().await, Direction::Push, 2)
     );
+    assert!(rec.scanned_ms.is_some_and(|t| t <= rec.at_ms));
     let received = b.received.lock().unwrap().clone();
     assert_eq!(received, vec![(p.id, a.id().await, 2, 0)]);
 }
@@ -112,6 +115,7 @@ async fn pull_mirrors_into_a_new_local_project() {
     assert_eq!(mine.folders[0].local_path.as_deref(), Some(beds.as_path()));
     let rec = b.project(p.id).await.unwrap().last_transfer.unwrap();
     assert_eq!((rec.peer, rec.direction), (a.id().await, Direction::Pull));
+    assert!(rec.scanned_ms.is_some_and(|t| t <= rec.at_ms));
 
     // A deletion on the source spreads on the next pull.
     std::fs::remove_file(theirs.join("sketches/a.txt")).unwrap();

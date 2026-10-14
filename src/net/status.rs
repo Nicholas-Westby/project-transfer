@@ -38,7 +38,12 @@ pub(super) async fn status(shared: &Shared, allows: Permissions, caller: Instanc
     }
 }
 
-pub(super) async fn project_info(shared: &Shared, project: ProjectId) -> Response {
+/// `last_with_you` is about `caller`, the computer asking.
+pub(super) async fn project_info(
+    shared: &Shared,
+    project: ProjectId,
+    caller: InstanceId,
+) -> Response {
     let pf = shared.settings.read().await.projects_folder.clone();
     let home = shared.home.as_deref();
     let projects = shared.projects.read().await;
@@ -49,6 +54,7 @@ pub(super) async fn project_info(shared: &Shared, project: ProjectId) -> Respons
             name: p.name.clone(),
             primary: p.primary,
             description: p.description.clone(),
+            last_with_you: p.last_transfer.as_ref().is_some_and(|t| t.peer == caller),
             folders: p
                 .folders
                 .iter()

@@ -1,5 +1,6 @@
 //! What a transfer will do, and the pure checks that shape it.
 
+use super::sync_count::SyncChoice;
 use crate::manifest::{Change, Entry, Kind, Manifest, Plan};
 use crate::model::{Direction, FolderId, InstanceId, Os, ProjectId};
 use std::collections::HashMap;
@@ -25,6 +26,9 @@ pub struct Preview {
     pub link: Option<super::link::Link>,
     /// The transfer changes the description on the receiving computer.
     pub description: bool,
+    /// Why a sync chose this direction; None for a push or pull asked for
+    /// as such.
+    pub sync: Option<SyncChoice>,
 }
 
 #[derive(Clone, Debug, PartialEq)]

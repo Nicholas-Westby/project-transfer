@@ -1,19 +1,15 @@
 //! Building the preview: scan both sides, compare, hash only what is unclear.
 
-use super::preview::{
-    FolderPreview, LeftOut, Preview, Replaced, TransferRequest, drop_unholdable, replaced_folders,
-};
+use super::preview::{Preview, TransferRequest};
 use super::projects::{check_names_for, default_path};
-use super::{home, link, safe_join};
+use super::scans::{Ask, Ctx, Scans, Sides};
+use super::{home, link};
 use crate::ignore_rules::{IgnoreSpec, Matcher};
-use crate::manifest::{Manifest, compare, compose_for, hash_file, resolve_hashes, scan};
+use crate::manifest::compose_for;
 use crate::model::{Direction, FolderId, Os, Project, ProjectId};
 use crate::net::{Connection, Shared};
-use crate::protocol::{FolderScan, ProjectSummary, Request, Response};
+use crate::protocol::{ProjectSummary, Request, Response};
 use anyhow::{Context, bail};
-use std::collections::HashMap;
-use std::path::PathBuf;
-use tracing::info;
 
 /// Fails unless `conn` reaches the computer the request names.
 pub(super) fn check_peer(conn: &Connection, req: &TransferRequest) -> anyhow::Result<()> {
@@ -70,7 +66,19 @@ async fn check_allowed(
 pub async fn prepare(
     conn: &mut Connection,
     shared: &Shared,
+    req: TransferRequest,
+) -> anyhow::Result<Preview> {
+    prepare_with(conn, shared, req, Scans::default()).await
+}
+
+/// `prepare`, using what `scans` holds before reading anything again. The
+/// scans must have been made over `conn`, which the other computer's
+/// answers about folders it has not set up depend on.
+pub(super) async fn prepare_with(
+    conn: &mut Connection,
+    shared: &Shared,
     mut req: TransferRequest,
+    scans: Scans,
 ) -> anyhow::Result<Preview> {
     check_peer(conn, &req)?;
     let theirs = check_allowed(conn, req.direction).await?;
@@ -96,6 +104,7 @@ pub async fn prepare(
         project: req.project,
         warnings,
         left_out: Vec::new(),
+        scans,
     };
     let mut folders = Vec::new();
     let description;
@@ -250,6 +259,7 @@ pub async fn prepare(
         warnings: ctx.warnings,
         link,
         description,
+        sync: None,
     })
 }
 
@@ -260,140 +270,4 @@ fn unclaimed(path: &str, computer: &str) -> String {
         "`{path}` already exists on {computer} and isn't part of this project yet. Files there \
          that aren't in the source will be removed."
     )
-}
-
-struct Ctx<'a> {
-    conn: &'a mut Connection,
-    spec: IgnoreSpec,
-    project: ProjectId,
-    warnings: Vec<String>,
-    left_out: Vec<LeftOut>,
-}
-
-/// What the other computer needs to scan a folder, or to say where it
-/// would land there.
-struct Ask<'a> {
-    folder: FolderId,
-    folder_name: &'a str,
-    project_name: &'a str,
-    multi: bool,
-    hint: Option<String>,
-}
-
-/// One folder's two sides: (manifest, display path) each.
-struct Sides {
-    folder: FolderId,
-    name: String,
-    src: (Manifest, String),
-    dst: (Manifest, String),
-    /// This computer's side, which is hashed here.
-    local_root: PathBuf,
-    local_is_src: bool,
-    dest_exists: bool,
-    dest_os: Os,
-}
-
-impl Ctx<'_> {
-    fn leave_out(&mut self, name: &str, reason: String) {
-        self.left_out.push(LeftOut {
-            name: name.to_string(),
-            reason,
-        });
-    }
-
-    async fn remote_scan(&mut self, ask: Ask<'_>) -> anyhow::Result<FolderScan> {
-        let req = Request::Manifest {
-            project: self.project,
-            folder: ask.folder,
-            ignore: self.spec.clone(),
-            folder_name: ask.folder_name.into(),
-            project_name: ask.project_name.into(),
-            multi_folder: ask.multi,
-            from_os: Some(Os::current()),
-            home_hint: ask.hint,
-        };
-        match self.conn.request(&req).await? {
-            Response::Manifest(s) => Ok(s),
-            other => Err(unexpected(self.conn, "the folder scan", other)),
-        }
-    }
-
-    async fn local_scan(&self, root: PathBuf, compose: bool) -> anyhow::Result<Manifest> {
-        let spec = self.spec.clone();
-        let shown = root.display().to_string();
-        tokio::task::spawn_blocking(move || scan(&root, &Matcher::new(&spec)?, compose))
-            .await?
-            .with_context(|| format!("Could not read {shown}"))
-    }
-
-    async fn remote_hashes(
-        &mut self,
-        folder: FolderId,
-        paths: &[String],
-    ) -> anyhow::Result<HashMap<String, String>> {
-        let req = Request::Hashes {
-            project: self.project,
-            folder,
-            paths: paths.to_vec(),
-        };
-        match self.conn.request(&req).await? {
-            Response::Hashes(h) => Ok(h),
-            other => Err(unexpected(self.conn, "the hash request", other)),
-        }
-    }
-
-    async fn plan(&mut self, s: Sides) -> anyhow::Result<FolderPreview> {
-        let (src, dst) = (&s.src.0, &s.dst.0);
-        let mut plan = compare(src, dst);
-        if !plan.needs_hash.is_empty() {
-            let remote = self.remote_hashes(s.folder, &plan.needs_hash).await?;
-            let local = local_hashes(s.local_root.clone(), plan.needs_hash.clone()).await;
-            plan = if s.local_is_src {
-                resolve_hashes(plan, &local, &remote)
-            } else {
-                resolve_hashes(plan, &remote, &local)
-            };
-        }
-        info!(
-            "preview of {}: {} ({} entries) against {} ({} entries): {} changes",
-            s.name,
-            s.src.1,
-            src.entries.len(),
-            s.dst.1,
-            dst.entries.len(),
-            plan.changes.len()
-        );
-        let (plan, skipped, case_clashes) = drop_unholdable(plan, src, dst, s.dest_os);
-        let mut replaced = replaced_folders(&plan, dst);
-        replaced.extend(case_clashes);
-        self.warnings.extend(replaced.iter().map(Replaced::warning));
-        Ok(FolderPreview {
-            folder: s.folder,
-            name: s.name,
-            source_path: s.src.1,
-            dest_path: s.dst.1,
-            dest_will_be_created: !s.dest_exists,
-            plan,
-            skipped,
-            replaced,
-        })
-    }
-}
-
-async fn local_hashes(root: PathBuf, paths: Vec<String>) -> HashMap<String, String> {
-    tokio::task::spawn_blocking(move || {
-        paths
-            .into_iter()
-            .filter_map(|rel| {
-                let p = safe_join(&root, &rel).ok()?;
-                std::fs::symlink_metadata(&p)
-                    .ok()?
-                    .is_file()
-                    .then_some(())?;
-                Some((rel, hash_file(&p).ok()?))
-            })
-            .collect()
-    })
-    .await
-    .unwrap_or_default()
 }

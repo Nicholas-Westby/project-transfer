@@ -121,6 +121,7 @@ pub fn seeded_state() -> UiState {
                 direction: Direction::Push,
                 files: 42,
                 by_peer: false,
+                scanned_ms: None,
             }),
             description: Description {
                 text: "Plans which vegetables go in which raised bed each season, and \
@@ -162,6 +163,7 @@ pub fn seeded_state() -> UiState {
             ],
             primary: id(20),
             description: Default::default(),
+            last_with_you: false,
         },
     );
     // Only on the peer, so the project list offers to pull it.
@@ -178,6 +180,7 @@ pub fn seeded_state() -> UiState {
             }],
             primary: id(24),
             description: Default::default(),
+            last_with_you: false,
         },
     );
     let out = |t: &str, stderr| OutputLine {
@@ -297,6 +300,7 @@ pub fn sample_preview(s: &UiState) -> Preview {
         warnings: vec![],
         link: None,
         description: false,
+        sync: None,
     }
 }
 

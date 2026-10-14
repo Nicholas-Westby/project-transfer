@@ -49,6 +49,7 @@ fn sample_project() -> Project {
             direction: Direction::Pull,
             files: 3,
             by_peer: false,
+            scanned_ms: None,
         }),
         description: Description {
             text: "Plans the beds.\nWaters on Mondays.".into(),

@@ -203,6 +203,7 @@ async fn end(ctx: &Ctx<'_>, state: &mut SessionState) -> Response {
         Direction::Push,
         files,
         StartedBy::Peer,
+        state.scanned_ms,
     )
     .await
     {

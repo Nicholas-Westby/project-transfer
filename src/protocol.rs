@@ -257,6 +257,10 @@ pub struct RemoteProject {
     /// Missing from computers that don't have descriptions yet.
     #[serde(default)]
     pub description: Description,
+    /// Whether the answering computer's latest transfer of this project
+    /// was with the asking one. Missing from older versions.
+    #[serde(default)]
+    pub last_with_you: bool,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]

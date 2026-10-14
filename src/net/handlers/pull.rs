@@ -70,7 +70,12 @@ pub async fn get_file<S: AsyncRead + AsyncWrite + Unpin>(
     Ok(())
 }
 
-pub async fn end_pull(ctx: &Ctx<'_>, project: ProjectId, files: u64) -> Response {
+pub async fn end_pull(
+    ctx: &Ctx<'_>,
+    project: ProjectId,
+    files: u64,
+    scanned_ms: Option<i64>,
+) -> Response {
     let started = StartedBy::Peer;
     match record_transfer(
         ctx.shared,
@@ -79,6 +84,7 @@ pub async fn end_pull(ctx: &Ctx<'_>, project: ProjectId, files: u64) -> Response
         Direction::Pull,
         files,
         started,
+        scanned_ms,
     )
     .await
     {

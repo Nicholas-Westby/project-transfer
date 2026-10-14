@@ -210,7 +210,7 @@ pub(super) async fn session<S: AsyncRead + AsyncWrite + Unpin + Send>(
                 return relay::relay(shared, stream, &caller, to).await;
             }
             Request::ProjectInfo { project } => {
-                write_msg(stream, &project_info(shared, project).await).await?;
+                write_msg(stream, &project_info(shared, project, id).await).await?;
             }
             other => {
                 let peer = peer.context("the gate let an unpaired peer through")?;

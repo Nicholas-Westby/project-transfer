@@ -68,6 +68,9 @@ impl App {
                 };
                 let r = dialogs::sheet(ui, "transfer_ready", wide, true, |ui| {
                     dialogs::sheet_title(ui, &title);
+                    if let Some(choice) = &p.sync {
+                        widgets::muted(ui, choice.reason(&peer));
+                    }
                     ready(ui, p, &peer)
                 });
                 let (answer, picked) = r.inner;

@@ -195,9 +195,9 @@ fn pulling_a_remote_only_project_says_why_it_cannot() {
     let fake = FakeBackend::seeded();
     fake.update(|s| s.peers[0].peer.granted.may_pull_from_me = false);
     let mut h = ui_harness(fake.clone());
-    // Once under the project's own Pull button and once in the list.
+    // Under the project's own Pull and Sync buttons, and in the list.
     let reasons = h.get_all_by_label_contains("doesn't allow pulls to this computer");
-    assert_eq!(reasons.count(), 2);
+    assert_eq!(reasons.count(), 3);
     h.get_by_label("Pull").click();
     h.run();
     assert!(fake.actions().is_empty());

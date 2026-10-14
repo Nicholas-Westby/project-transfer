@@ -38,6 +38,7 @@ fn preview(direction: Direction, changes: Vec<Change>) -> Preview {
         warnings: vec![],
         link: None,
         description: false,
+        sync: None,
     }
 }
 

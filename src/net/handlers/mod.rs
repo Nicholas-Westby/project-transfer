@@ -34,6 +34,8 @@ pub struct SessionState {
     /// Folders this connection scanned, so `Hashes` reads the same place
     /// even for a folder this computer has not set up yet.
     roots: HashMap<(ProjectId, FolderId), PathBuf>,
+    /// When this computer first scanned a folder for this connection.
+    scanned_ms: Option<i64>,
     push: Option<push::PushState>,
 }
 
@@ -79,7 +81,9 @@ pub async fn handle<S: AsyncRead + AsyncWrite + Unpin + Send>(
             folder,
             rel,
         } => return pull::get_file(ctx, stream, project, folder, &rel).await,
-        Request::EndPull { project, files } => pull::end_pull(ctx, project, files).await,
+        Request::EndPull { project, files } => {
+            pull::end_pull(ctx, project, files, state.scanned_ms).await
+        }
         Request::SyncProject {
             project,
             home_hints,
@@ -149,6 +153,10 @@ async fn manifest(
     ignore: crate::ignore_rules::IgnoreSpec,
     from_os: Option<Os>,
 ) -> Response {
+    // Before the scan: a file made after it never travels with this transfer.
+    state
+        .scanned_ms
+        .get_or_insert_with(crate::transfer::projects::now_ms);
     let (root, set_up) = match stored_root(ctx.shared, project, folder).await {
         Some(p) => (p, true),
         None => {

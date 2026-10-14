@@ -212,6 +212,7 @@ alphanumeric
 already
 also
 alters
+although
 always
 amber
 ambiguous
@@ -250,6 +251,7 @@ apostrophe
 apostrophes
 app
 app's
+app-here
 app2
 appear
 appearance
@@ -430,6 +432,7 @@ boundary
 bounding
 bounds
 box
+boxed
 boxes
 boxing
 br
@@ -443,6 +446,7 @@ brings
 brisk
 broad
 broken-pipe
+brought
 browse
 buf
 buffer
@@ -592,6 +596,7 @@ clipped
 clippy
 clock
 clock's
+clocks
 clone
 clone's
 cloned
@@ -747,6 +752,7 @@ couldn't
 count
 counted
 counterpart
+counting
 counts
 cover
 coverage
@@ -833,6 +839,7 @@ deletions
 deliberately
 delta
 dep
+depend
 dependencies
 deps
 depth
@@ -892,6 +899,7 @@ digits
 dir
 direct
 direction
+direction's
 directions
 directly
 directories
@@ -943,6 +951,7 @@ doubled
 down
 downcast
 downgrade
+dozen
 draft
 draft-2
 drafts
@@ -990,6 +999,7 @@ edit
 edited
 editing
 edition
+editmsg
 editor
 edits
 effect
@@ -1009,6 +1019,7 @@ embed
 embedded
 embeds
 emoji
+emptied
 empty
 en
 enable
@@ -1320,6 +1331,7 @@ gradle
 grant
 granted
 grants
+greater
 greek
 greenhouse
 greets
@@ -1374,6 +1386,7 @@ hash-b
 hashed
 hasher
 hashes
+hashing
 have
 haven't
 having
@@ -1494,6 +1507,7 @@ index
 indexed
 indirect
 individual
+inferred
 infinity
 info
 infos
@@ -1663,6 +1677,7 @@ lieu
 lifetimes
 light
 like
+likelier
 likeliest
 likely
 likewise
@@ -1708,6 +1723,7 @@ log
 logged
 logging
 login
+logo
 logs
 lone
 long
@@ -1848,6 +1864,7 @@ modification
 modified
 modifiers
 modify
+module
 modules
 moment
 mondays
@@ -1917,7 +1934,9 @@ networking
 networks
 never
 new
+new-here
 new-object
+new-there
 newer
 newest
 news
@@ -1966,6 +1985,7 @@ notified
 notify
 now
 nowhere
+npm
 nrtux0
 ns
 nudged
@@ -1998,6 +2018,7 @@ often
 ohm
 ok
 old
+old-notes
 old-sketches
 olddir
 older
@@ -2052,6 +2073,7 @@ outgoing
 output
 outside
 outstanding
+outvoting
 over
 overflow
 overflows
@@ -2200,6 +2222,7 @@ pm
 pn
 png
 point
+pointed
 pointer
 pointing
 points
@@ -2230,6 +2253,7 @@ prefix
 prefixing
 prelude
 prepare
+prepared
 preparing
 present
 presented
@@ -2391,6 +2415,7 @@ receivers
 receives
 receiving
 recent
+recently
 record
 recorded
 recording
@@ -2483,6 +2508,7 @@ repository
 repository's
 req
 request
+request's
 requested
 requester
 requests
@@ -2540,6 +2566,8 @@ revokes
 revoking
 rewrite
 rewrites
+rewritten
+rewrote
 rf
 rfd
 rfind
@@ -2623,6 +2651,7 @@ scales
 scan
 scanned
 scanning
+scans
 scheme
 schemes
 scope
@@ -2748,6 +2777,7 @@ shutdown
 sibling
 siblings
 side
+side's
 sides
 sigkill
 sign
@@ -2948,6 +2978,7 @@ support
 supported
 supports
 surface
+surprise
 survive
 survives
 surviving
@@ -2965,6 +2996,7 @@ symlink
 symlinks
 symmetric
 sync
+sync's
 synced
 syncing
 syncs
@@ -2991,6 +3023,7 @@ talking
 talks
 tall
 taller
+tally
 tar
 target
 target's
@@ -3061,6 +3094,8 @@ tide
 tide-tables
 tidy
 tie
+tied
+ties
 tiger
 tilde
 time
@@ -3074,6 +3109,7 @@ tint
 tiny
 tip
 title
+titled
 tls
 tls12
 tls13
@@ -3123,6 +3159,7 @@ translates
 transparent
 transpose
 travel
+travelled
 travels
 treating
 treats
@@ -3249,6 +3286,7 @@ util
 uuid
 v
 v1
+v2
 v4
 v6
 val

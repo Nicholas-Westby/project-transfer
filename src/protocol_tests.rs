@@ -67,3 +67,11 @@ async fn a_message_goes_out_in_one_write() {
     write_msg(&mut w, &Request::Status).await.unwrap();
     assert_eq!(w.0.len(), 1, "{:?}", w.0);
 }
+
+#[test]
+fn a_project_from_an_older_version_was_not_last_moved_with_us() {
+    let older = r#"{"name":"garden","folders":[],
+        "primary":"00000000-0000-0000-0000-000000000001"}"#;
+    let info: RemoteProject = serde_json::from_str(older).unwrap();
+    assert!(!info.last_with_you);
+}

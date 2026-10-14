@@ -8,6 +8,7 @@ mod listed;
 mod paired;
 mod projects;
 mod reach;
+mod sync;
 
 use std::time::{Duration, Instant};
 

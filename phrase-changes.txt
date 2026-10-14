@@ -1,1 +1,3 @@
-+AddIgnore
++PrepareSync
++SyncChoice
++TransferKind

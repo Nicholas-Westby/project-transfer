@@ -2,9 +2,10 @@
 
 Project Transfer is a desktop app for macOS and Windows that copies project
 folders between your computers on the same local network. Open it on two
-computers, pair them once, and from then on push or pull a project with one
-button. The app finds the other computer by itself, talks to it over its own
-encrypted connection, and shows you every change before it writes anything.
+computers, pair them once, and from then on push, pull or sync a project
+with one button. The app finds the other computer by itself, talks to it
+over its own encrypted connection, and shows you every change before it
+writes anything.
 
 ![Project Transfer main window](assets/images/project-transfer.webp)
 
@@ -38,6 +39,36 @@ To install somewhere else, pass a folder:
 The installed app does not need the source checkout. Settings and paired
 computers are kept when you reinstall.
 
+## Push, pull or sync
+
+Choose a project and a paired computer, then one of the three buttons under
+the project's folders:
+
+- **Pull from <other computer>** makes the copy on this computer match the
+  other one.
+- **Sync with <other computer>** pushes or pulls, whichever way has more
+  files with newer changes. A file that differs between the two computers
+  counts for the one where it changed last. A file only one computer has
+  counts for that one, unless both computers last moved the project with
+  each other, both have files in that folder outside `.git`, and the file
+  is older than that transfer's preview: then the other computer removed
+  it, and it counts for that one instead. The files in a `.git` folder
+  count as one for each computer, however many a commit changed. A file
+  whose content matches and only its time differs doesn't count, and with
+  **Send everything** ticked, neither does a file the ignore list would
+  leave out. On a tie, the computer with the most recent change wins; if
+  that ties too, it pushes. Sync goes by the files' modified times, so keep
+  both computers' clocks right. Sync is always one push or one pull, never
+  a mix, so it needs the other computer to allow both.
+- **Push to <other computer>** makes the copy on the other computer match
+  this one.
+
+Each one first shows what will change, and nothing is written until you
+confirm. The preview of a sync starts with a line saying which way it went
+and why, including how many of those files were removed since the last
+transfer. If ignoring files from the preview turns a sync the other way,
+the preview says so.
+
 ## Where folders go on the other computer
 
 Each computer keeps its own path for every folder of a project. The folders
@@ -58,12 +89,12 @@ If that place is already part of another project there, the folder goes
 to the Projects folder instead, so no folder ever mirrors over another
 project's files.
 
-**Sync details with <other computer>**, under the Push and Pull buttons,
-sends the project's folders, description and commands without copying any
-files, and brings back what the other computer has that this one lacks. A
-new folder then shows its place in the **On <other computer>** column
-before anything is pushed. Syncing needs the other computer to allow pushes
-from this one.
+**Sync details with <other computer>**, under the Pull, Sync and Push
+buttons, sends the project's folders, description and commands without
+copying any files, and brings back what the other computer has that this one
+lacks. A new folder then shows its place in the **On <other computer>**
+column before anything is pushed. Syncing details needs the other computer to
+allow pushes from this one.
 
 To put a folder somewhere else on the other computer, open the folder's
 **…** menu and choose **Change folder on <other computer>…**. Enter a full

@@ -49,7 +49,7 @@ pub async fn sync(ctx: &Ctx<'_>, project: Project, hints: HashMap<FolderId, Stri
             info!("{peer} synced details of {name}: {added} folders new here");
             let text = format!("{peer} synced details of `{name}`.");
             let _ = ctx.shared.events.send(NetEvent::ProjectsChanged(text));
-            project_info(ctx.shared, project.id).await
+            project_info(ctx.shared, project.id, ctx.peer.id).await
         }
         Err(e) => {
             warn!(

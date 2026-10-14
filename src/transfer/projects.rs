@@ -273,6 +273,7 @@ pub async fn record_transfer(
     direction: Direction,
     files: u64,
     started: StartedBy,
+    scanned_ms: Option<i64>,
 ) -> anyhow::Result<()> {
     update_projects(shared, |all| {
         let p = all
@@ -285,6 +286,7 @@ pub async fn record_transfer(
             direction,
             files,
             by_peer: matches!(started, StartedBy::Peer),
+            scanned_ms,
         });
         Ok(())
     })

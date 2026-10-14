@@ -3,6 +3,7 @@
 mod pairing_support;
 
 use pairing_support::*;
+use project_transfer::model::{Direction, TransferRecord};
 use project_transfer::net::{Connection, NotThePairedComputer};
 use project_transfer::protocol::{Request, Response};
 
@@ -106,6 +107,29 @@ async fn paired_peer_gets_status_and_project_info() {
         conn.request(&missing).await.unwrap(),
         Response::ProjectInfo(None)
     );
+}
+
+#[tokio::test]
+async fn project_info_says_whether_the_last_transfer_was_with_the_asker() {
+    let (a, b) = paired(perms(true, true)).await;
+    let mut p = project();
+    let mut conn = Connection::open(b.addr, &a.shared).await.unwrap();
+    for (with, want) in [(id_of(&a).await, true), (uuid::Uuid::new_v4(), false)] {
+        p.last_transfer = Some(TransferRecord {
+            at_ms: 5,
+            peer: with,
+            direction: Direction::Push,
+            files: 1,
+            by_peer: true,
+            scanned_ms: None,
+        });
+        *b.shared.projects.write().await = vec![p.clone()];
+        let ask = Request::ProjectInfo { project: p.id };
+        match conn.request(&ask).await.unwrap() {
+            Response::ProjectInfo(Some(info)) => assert_eq!(info.last_with_you, want),
+            other => panic!("{other:?}"),
+        }
+    }
 }
 
 /// Sent to the computer whose identity changed.

@@ -173,6 +173,7 @@ impl Run<'_> {
             req.direction,
             self.summary.files,
             StartedBy::Here,
+            self.conn.scanned_ms(),
         )
         .await
     }

@@ -15,6 +15,7 @@ mod reach;
 mod runs;
 mod settings;
 mod state;
+mod transfer_words;
 mod transfers;
 
 #[cfg(test)]

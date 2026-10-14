@@ -249,7 +249,7 @@ fn the_activity_line_for_a_finished_transfer_tells_the_time_in_minutes() {
             took_ms,
             ..Default::default()
         };
-        transfers::done_sentence(crate::model::Direction::Push, "Windows PC", &summary)
+        transfer_words::done_sentence(crate::model::Direction::Push, "Windows PC", &summary)
     };
     assert_eq!(
         said(2_409_300),

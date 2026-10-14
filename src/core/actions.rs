@@ -67,6 +67,9 @@ pub enum Action {
     SetPeerFolderPath(ProjectId, FolderId, String),
 
     Prepare(TransferRequest),
+    /// Like `Prepare`, but the direction is whichever side has more files
+    /// with newer changes; the request's own is ignored.
+    PrepareSync(TransferRequest),
     /// Runs the preview in `TransferState::Ready`.
     Execute,
     CancelTransfer,
@@ -144,7 +147,8 @@ impl Core {
             Action::SyncDetails(id) => self.sync_details(id),
             Action::SetPeerFolderPath(id, f, path) => self.set_peer_folder(id, f, path),
 
-            Action::Prepare(req) => self.prepare(req),
+            Action::Prepare(req) => self.prepare(req, false),
+            Action::PrepareSync(req) => self.prepare(req, true),
             Action::Execute => self.execute(),
             Action::CancelTransfer => {
                 self.cancel_transfer();

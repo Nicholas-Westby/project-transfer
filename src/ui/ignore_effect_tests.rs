@@ -60,6 +60,7 @@ fn preview(folders: Vec<FolderPreview>) -> Preview {
         warnings: vec!["A warning.".into()],
         link: None,
         description: false,
+        sync: None,
     }
 }
 

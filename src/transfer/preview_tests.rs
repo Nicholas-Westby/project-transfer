@@ -70,6 +70,7 @@ fn preview(plans: Vec<Plan>) -> Preview {
         warnings: vec![],
         link: None,
         description: false,
+        sync: None,
     }
 }
 

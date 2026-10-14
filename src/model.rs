@@ -37,6 +37,15 @@ pub struct InstanceSettings {
     pub port: u16,
 }
 
+/// What a transfer button does: push, pull, or sync, which does one of the
+/// two.
+#[derive(Clone, Copy, Debug, Serialize, Deserialize, PartialEq, Eq)]
+pub enum TransferKind {
+    Push,
+    Pull,
+    Sync,
+}
+
 #[derive(Clone, Copy, Debug, Default, Serialize, Deserialize, PartialEq, Eq)]
 pub struct Permissions {
     pub may_push_to_me: bool,
@@ -112,6 +121,11 @@ pub struct TransferRecord {
     /// the peer's: a push by the peer landed here.
     #[serde(default)]
     pub by_peer: bool,
+    /// When this computer read its side for the transfer. A file made after
+    /// that never travelled, though it is older than `at_ms`. Missing from
+    /// older records.
+    #[serde(default)]
+    pub scanned_ms: Option<i64>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
