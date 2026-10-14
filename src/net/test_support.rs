@@ -28,6 +28,7 @@ pub(super) fn shared(
         last_peer: None,
         theme: Default::default(),
         port: 0,
+        last_started: None,
     };
     let (tx, rx) = tokio::sync::mpsc::unbounded_channel();
     let s = Shared {

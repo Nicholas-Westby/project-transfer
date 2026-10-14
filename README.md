@@ -82,6 +82,18 @@ The viewer shows text, up to the first 1 MB of each copy. Seeing the other
 computer's copy needs that computer to allow pulls from this one, and a
 version of Project Transfer that has the viewer.
 
+## The Dock menu
+
+While Project Transfer is open on a Mac, right-click its icon in the Dock to
+repeat the last transfer you confirmed on this computer, such as **Push
+garden-planner to Studio**, or to do the opposite, such as **Pull
+garden-planner from Studio**. After a sync, the menu offers the sync, then a
+pull and a push. Choosing one brings the window forward, selects the project
+and the computer, and opens the same preview as the button, so nothing moves
+before you confirm. A finished transfer's result closes first; while another
+transfer or a sheet is open, choosing only brings the window forward.
+Transfers another computer started don't count.
+
 ## Where folders go on the other computer
 
 Each computer keeps its own path for every folder of a project. The folders

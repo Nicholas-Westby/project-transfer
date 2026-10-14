@@ -97,8 +97,37 @@ fn instance_round_trips() {
     a.port = 4000;
     a.extra_ignores = vec!["*.tmp".into()];
     a.last_peer = Some(Uuid::new_v4());
+    a.last_started = Some(LastStarted {
+        kind: TransferKind::Sync,
+        project: Uuid::new_v4(),
+        peer: Uuid::new_v4(),
+    });
     s.save_instance(&a).unwrap();
     assert_eq!(s.load_or_create_instance().unwrap(), a);
+}
+
+#[test]
+fn an_instance_saved_before_the_dock_menu_remembers_no_transfer() {
+    let (_d, s) = store();
+    let old = r#"{"id":"7d8b6c1e-2f4a-4b5c-9d6e-0f1a2b3c4d5e","name":"Desk",
+        "projects_folder":"/work/Dev"}"#;
+    std::fs::write(s.root().join("instance.json"), old).unwrap();
+    let loaded = s.load_or_create_instance().unwrap();
+    assert_eq!(loaded.name, "Desk");
+    assert_eq!(loaded.last_started, None);
+}
+
+#[test]
+fn an_unknown_last_transfer_is_forgotten_not_fatal() {
+    let (_d, s) = store();
+    let newer = r#"{"id":"7d8b6c1e-2f4a-4b5c-9d6e-0f1a2b3c4d5e","name":"Desk",
+        "projects_folder":"/work/Dev","port":4000,"last_started":{"kind":"Mirror",
+        "project":"00000000-0000-0000-0000-00000000000a",
+        "peer":"00000000-0000-0000-0000-000000000002"}}"#;
+    std::fs::write(s.root().join("instance.json"), newer).unwrap();
+    let loaded = s.load_or_create_instance().unwrap();
+    assert_eq!((loaded.name.as_str(), loaded.port), ("Desk", 4000));
+    assert_eq!(loaded.last_started, None);
 }
 
 #[test]

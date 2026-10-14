@@ -1,6 +1,6 @@
 //! Persisted data types shared by the store, the sync code and the UI.
 
-use serde::{Deserialize, Serialize};
+use serde::{Deserialize, Deserializer, Serialize};
 use std::net::SocketAddr;
 use std::path::PathBuf;
 
@@ -35,6 +35,16 @@ pub struct InstanceSettings {
     /// 0 means pick a free port at start-up.
     #[serde(default)]
     pub port: u16,
+    /// The last transfer this computer's user confirmed, which the Dock
+    /// menu offers again.
+    #[serde(default, deserialize_with = "forgiving")]
+    pub last_started: Option<LastStarted>,
+}
+
+/// An entry this version can't read, such as a kind of transfer added
+/// later, is forgotten rather than keeping the app from starting.
+fn forgiving<'de, D: Deserializer<'de>>(d: D) -> Result<Option<LastStarted>, D::Error> {
+    Ok(serde_json::from_value(serde_json::Value::deserialize(d)?).ok())
 }
 
 /// What a transfer button does: push, pull, or sync, which does one of the
@@ -44,6 +54,14 @@ pub enum TransferKind {
     Push,
     Pull,
     Sync,
+}
+
+/// A transfer started on this computer, as the Dock menu repeats it.
+#[derive(Clone, Copy, Debug, Serialize, Deserialize, PartialEq, Eq)]
+pub struct LastStarted {
+    pub kind: TransferKind,
+    pub project: ProjectId,
+    pub peer: InstanceId,
 }
 
 #[derive(Clone, Copy, Debug, Default, Serialize, Deserialize, PartialEq, Eq)]

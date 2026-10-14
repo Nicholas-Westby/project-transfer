@@ -1,9 +1,57 @@
-//! Sync from the UI's side: the preview says why it went the way it did.
+//! Sync from the UI's side: the preview says why it went the way it did,
+//! and confirming it is remembered for the Dock menu.
 
 use super::paired::*;
 use super::*;
-use crate::model::Direction;
+use crate::model::{Direction, LastStarted, TransferKind};
 use crate::transfer::TransferRequest;
+
+#[test]
+fn a_confirmed_sync_is_remembered_for_the_dock_menu() {
+    let (a, b) = (Fixture::new(), Fixture::new());
+    for f in [&a, &b] {
+        f.act(Action::SetProjectsFolder(f.dir.path().join("Dev")));
+    }
+    pair(&a, &b, Some(at(&b)), None);
+    pair(&b, &a, Some(at(&a)), None);
+    let p = a.create("garden-planner", "app");
+    let root = p.folders[0].local_path.clone().unwrap();
+    std::fs::write(root.join("main.rs"), "fn main() {}").unwrap();
+    a.act(Action::PrepareSync(TransferRequest {
+        peer: id(&b),
+        project: p.id,
+        // Ignored: the sync picks.
+        direction: Direction::Pull,
+        send_everything: false,
+    }));
+    wait_until(
+        &a.core,
+        "the sync's preview",
+        |s| matches!(&s.transfer, TransferState::Ready(p) if p.sync.is_some()),
+    );
+    let TransferState::Ready(preview) = a.core.state().transfer.clone() else {
+        unreachable!()
+    };
+    // B has nothing yet, so everything is newer here.
+    assert_eq!(preview.request.direction, Direction::Push);
+    assert!(a.core.state().me.last_started.is_none());
+    a.act(Action::Execute);
+    wait_until(&a.core, "the push to finish", |s| {
+        matches!(s.transfer, TransferState::Finished(_))
+    });
+    let want = Some(LastStarted {
+        kind: TransferKind::Sync,
+        project: p.id,
+        peer: id(&b),
+    });
+    assert_eq!(a.core.state().me.last_started, want);
+    assert_eq!(
+        a.store().load_or_create_instance().unwrap().last_started,
+        want
+    );
+    // The computer that answered remembers nothing.
+    assert_eq!(b.core.state().me.last_started, None);
+}
 
 #[test]
 fn a_sync_that_cannot_be_prepared_says_so() {

@@ -8,6 +8,7 @@ mod computers;
 mod confirmations;
 pub mod description;
 pub mod dialogs;
+mod dock_menu;
 mod file_panes;
 mod file_view;
 mod folders;
@@ -37,6 +38,7 @@ pub use picker::{FolderPicker, RfdPicker};
 
 use crate::core::{Action, AppCore, TransferState, UiState};
 use crate::discovery::Discovered;
+use crate::dock::Dock;
 use crate::model::{CommandId, Permissions, ProjectId, ThemeChoice};
 use crate::transfer::TransferRequest;
 use std::collections::HashSet;
@@ -114,6 +116,8 @@ pub struct View {
     pub my_addresses: Option<Vec<String>>,
     /// The ignore dialog over the open preview.
     pub ignore: Option<ignore_sheet::Draft>,
+    /// A transfer picked in the Dock menu, waiting for its computer.
+    pub dock_pending: Option<dock_menu::Pending>,
     applied_theme: Option<ThemeChoice>,
 }
 
@@ -122,6 +126,8 @@ pub struct App {
     picker: Box<dyn FolderPicker>,
     styled: bool,
     pub view: View,
+    /// The Dock icon's menu: one that shows nothing until `with_dock`.
+    pub dock: Dock,
 }
 
 impl App {
@@ -131,7 +137,14 @@ impl App {
             picker,
             styled: false,
             view: View::default(),
+            dock: Dock::default(),
         }
+    }
+
+    /// Fills and follows the Dock menu `main` installed.
+    pub fn with_dock(mut self, dock: Dock) -> App {
+        self.dock = dock;
+        self
     }
 
     fn act(&self, a: Action) {
@@ -164,6 +177,7 @@ impl App {
             }
         }
         self.keep_selection(&s);
+        self.dock_menu(ui, &s);
 
         self.session_bar(ui, &s);
         self.activity(ui, &s);

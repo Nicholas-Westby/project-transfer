@@ -1,4 +1,5 @@
 0-garden
+00000000-0000-0000-0000-00000000000a
 000u32
 000u64
 00fa
@@ -157,6 +158,7 @@ act
 acting
 action
 actions
+activate
 active
 activity
 acts
@@ -199,6 +201,7 @@ alike
 alive
 all
 all-targets
+alloc
 allocate
 allocating
 allocator
@@ -325,6 +328,8 @@ author
 authors
 auto
 auto-answer
+autorelease
+autoreleasepool
 aux
 aux1
 available
@@ -447,6 +452,7 @@ brave
 break
 breaks
 bridge
+bring
 brings
 brisk
 broad
@@ -481,6 +487,7 @@ byte
 byte-order
 bytes
 c
+c-unwind
 c3
 cache
 cached
@@ -524,8 +531,10 @@ carry
 case
 case-insensitive
 cases
+cast
 cat-file
 catalog
+catch
 catches
 caught
 cause
@@ -610,6 +619,7 @@ clocks
 clone
 clone's
 cloned
+clones
 close
 closed
 closer
@@ -763,6 +773,7 @@ couldn't
 count
 counted
 counterpart
+counterparts
 counting
 counts
 cover
@@ -843,6 +854,8 @@ default-features
 defaults
 definitions
 delay
+delegate
+delegate's
 delete
 deleted
 deletes
@@ -851,9 +864,11 @@ deletion
 deletions
 deliberately
 delta
+deminiaturize
 dep
 depend
 dependencies
+deprecated
 deps
 depth
 deque
@@ -870,6 +885,7 @@ description
 descriptions
 descriptors
 deserialize
+deserializer
 deserves
 designer
 desired
@@ -945,6 +961,7 @@ dm
 dn
 dns
 do
+dock
 docs
 doctype
 document
@@ -1067,6 +1084,7 @@ epoch
 eq
 equal
 equals
+equivalent
 er
 err
 error
@@ -1133,6 +1151,7 @@ ext
 extend
 extended
 extension
+extern
 external
 extra
 extras
@@ -1163,6 +1182,7 @@ faq
 far
 farther
 fast
+fatal
 fbfd86e
 fc
 fc00
@@ -1258,6 +1278,8 @@ foreground
 foreign
 forget
 forgets
+forgiving
+forgotten
 form
 format
 format-version
@@ -1265,6 +1287,7 @@ formats
 formatter
 formed
 forms
+forward
 fot
 foto
 fotos
@@ -1480,6 +1503,7 @@ ibis
 icns
 ico
 icon
+icon's
 icon-only
 iconset
 iconutil
@@ -1505,6 +1529,7 @@ imagename
 imageops
 images
 img
+imp
 impl
 implemented
 implied
@@ -1577,10 +1602,12 @@ ip
 ips
 ir
 is
+isize
 isn't
 it
 it's
 item
+item's
 items
 iter
 iterator
@@ -1627,6 +1654,8 @@ killing
 kills
 kind
 kinds
+kit
+kit's
 kittest
 kittest's
 kiwi
@@ -1739,6 +1768,7 @@ ll
 lnk
 lo
 load
+loaded
 loading
 loads
 local
@@ -1842,6 +1872,7 @@ members
 memory
 men
 menu
+menu's
 merchantability
 merge
 merged
@@ -1852,6 +1883,8 @@ messages
 met
 meta
 metadata
+method
+methods
 microsoft
 mid
 mid-file
@@ -1864,6 +1897,7 @@ min
 mind
 mine
 mini
+miniaturized
 minified
 minimum
 minor
@@ -1916,6 +1950,7 @@ ms
 msg
 mtime
 mtimes
+mtm
 much
 multi
 multi-line
@@ -2018,6 +2053,7 @@ notes-link
 nothing
 notice
 noticed
+notices
 notified
 notify
 now
@@ -2037,6 +2073,9 @@ nuxt
 nx
 o
 obj
+objc2
+objc2-app-kit
+objc2-foundation
 object
 objects
 obtaining
@@ -2225,9 +2264,11 @@ phrase-changes
 phrases
 physical
 pick
+pick's
 picked
 picker
 pickers
+picking
 picks
 pid
 piece
@@ -2429,6 +2470,7 @@ rate
 rather
 raven
 raw
+rc
 rcgen
 rd
 re
@@ -2538,6 +2580,7 @@ renames
 render
 renders
 repaint
+repainting
 repairing
 repeat
 repeated
@@ -2587,6 +2630,7 @@ resp
 respond
 responder
 responder's
+responds
 response
 rest
 restart
@@ -2599,6 +2643,7 @@ result
 results
 resynchronised
 retain
+retained
 return
 returned
 returning
@@ -2630,6 +2675,7 @@ rid
 ride
 right
 right-aligned
+right-click
 rightly
 rights
 ring
@@ -2639,6 +2685,7 @@ rmf
 rng
 rngs
 roaming
+robin
 role
 roles
 rolling
@@ -2738,6 +2785,7 @@ secure
 security
 see
 seed
+seed-bank
 seed-catalog
 seedable
 seeded
@@ -2748,11 +2796,13 @@ seen
 sees
 segment
 segments
+sel
 select
 selectable
 selected
 selecting
 selection
+selector
 selects
 self
 self-signed
@@ -3099,6 +3149,7 @@ tasks
 tb
 tcf
 tcp
+teaches
 technical
 tell
 tells
@@ -3221,6 +3272,7 @@ transfer's
 transferred
 transfers
 translates
+transmute
 transparent
 transpose
 travel
@@ -3288,6 +3340,7 @@ unexpected
 unexpectedly
 unfinished
 unhex
+unhide
 unholdable
 unicast
 unicode
@@ -3325,6 +3378,7 @@ untouched
 untracked
 untrackedword
 unusable
+unwind
 unwrap
 up
 update
@@ -3475,6 +3529,8 @@ window
 window's
 windows
 windows-sys
+winit
+winit's
 winresource
 wins
 wire

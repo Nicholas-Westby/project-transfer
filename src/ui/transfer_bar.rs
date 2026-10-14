@@ -133,6 +133,9 @@ impl App {
         if shared && let Some(why) = &reasons[0] {
             ui.label(RichText::new(why).small().color(pal.muted()));
         }
+        if let Some(waiting) = self.dock_waiting(s) {
+            widgets::small_muted(ui, waiting);
+        }
         if let Some(kind) = start {
             self.start_transfer(s, p.id, kind);
         }
@@ -160,7 +163,8 @@ impl App {
     }
 
     /// Starts what the button for `kind` starts: the preview of a push or
-    /// pull, or the look at both sides a sync takes first.
+    /// pull, or the look at both sides a sync takes first. The Dock menu
+    /// starts transfers through here too.
     pub(super) fn start_transfer(&mut self, s: &UiState, project: ProjectId, kind: TransferKind) {
         let Some(peer) = s.selected_peer else {
             return;

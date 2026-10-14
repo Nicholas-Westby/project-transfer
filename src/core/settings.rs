@@ -3,8 +3,10 @@
 use super::{Core, lock};
 use crate::ignore_rules::{DEFAULT_IGNORES, IgnoreSpec, Matcher, trim};
 use crate::model::{InstanceSettings, ThemeChoice};
+use crate::transfer::link::Link;
 use anyhow::{Context, bail};
 use std::path::PathBuf;
+use tracing::warn;
 
 impl Core {
     /// Saves before memory changes, so memory never claims what the disk lacks.
@@ -23,6 +25,35 @@ impl Core {
         let me = next.clone();
         self.ui.update(|s| s.me = me);
         Ok(next)
+    }
+
+    /// Keeps the transfer the Dock menu offers on its project when `l`
+    /// gave the project another id, or failed to before it was saved.
+    pub(super) async fn follow_link(&self, l: &Link) {
+        let (to_here, from_here) = {
+            let all = self.shared.projects.read().await;
+            let has = |id| all.iter().any(|p| p.id == id);
+            (has(l.to), has(l.from))
+        };
+        let (now, old) = match (to_here, from_here) {
+            (true, _) => (l.to, l.from),
+            (false, true) => (l.from, l.to),
+            (false, false) => return,
+        };
+        let last = self.shared.settings.read().await.last_started;
+        if last.is_some_and(|t| t.project == old) {
+            let moved = self.update_settings(|s| {
+                // Another transfer may have been confirmed since the read.
+                if let Some(t) = &mut s.last_started
+                    && t.project == old
+                {
+                    t.project = now;
+                }
+            });
+            if let Err(e) = moved.await {
+                warn!("could not keep the Dock menu on its project: {e:#}");
+            }
+        }
     }
 
     pub(super) async fn rename(&self, name: String) -> anyhow::Result<()> {

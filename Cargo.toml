@@ -11,7 +11,7 @@ debug = false
 
 [package]
 name = "project-transfer"
-version = "0.1.75"
+version = "0.1.76"
 edition = "2024"
 description = "Mirror project folders between computers on a LAN"
 
@@ -22,6 +22,11 @@ path = "src/lib.rs"
 [[bin]]
 name = "project-transfer"
 path = "src/main.rs"
+
+# AppKit wants the main thread, which only a test without the harness has.
+[[test]]
+name = "dock_menu"
+harness = false
 
 [dependencies]
 eframe = "0.36"
@@ -66,6 +71,9 @@ libc = "0.2.190"
 [target.'cfg(target_os = "macos")'.dependencies]
 system-configuration-sys = "0.6"
 core-foundation = "0.10"
+objc2 = "0.6"
+objc2-app-kit = { version = "0.3", default-features = false, features = ["std", "NSApplication", "NSMenu", "NSMenuItem", "NSResponder", "NSWindow"] }
+objc2-foundation = { version = "0.3", default-features = false, features = ["std", "NSArray", "NSString"] }
 
 [target.'cfg(windows)'.dependencies]
 windows-sys = { version = "0.61", features = [

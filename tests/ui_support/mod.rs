@@ -93,6 +93,16 @@ pub fn with_drawings(s: &mut UiState) {
     s.transfer = TransferState::Ready(p);
 }
 
+/// Opens the sample preview with nothing left to do, as when a comparison
+/// finds both copies the same.
+pub fn nothing_to_do(s: &mut UiState) {
+    let mut p = sample_preview(s);
+    for f in &mut p.folders {
+        f.plan.changes.clear();
+    }
+    s.transfer = TransferState::Ready(p);
+}
+
 /// A file a preview rewrites.
 pub fn changed(rel: &str) -> Change {
     let kind = Kind::File {

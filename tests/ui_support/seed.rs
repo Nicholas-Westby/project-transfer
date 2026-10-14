@@ -39,6 +39,7 @@ pub fn seeded_state() -> UiState {
         last_peer: Some(id(2)),
         theme: ThemeChoice::Dark,
         port: 47820,
+        last_started: None,
     };
     let mut s = UiState::new(me, 47820);
     let peer = |n, name: &str, online, seen| PeerView {

@@ -1,5 +1,4 @@
 use super::*;
-use crate::model::Direction;
 
 fn preview(tag: u128) -> Preview {
     Preview {
@@ -39,4 +38,21 @@ fn dismissing_forgets_the_ready_preview() {
     slot.reset();
     assert!(slot.take_ready().is_none());
     assert!(!slot.offer(g, "late", preview(1)));
+}
+
+#[test]
+fn a_confirmed_sync_is_remembered_as_a_sync_whichever_way_it_goes() {
+    let mut p = preview(3);
+    assert_eq!(last_started(&p).kind, TransferKind::Push);
+    p.request.direction = Direction::Pull;
+    assert_eq!(last_started(&p).kind, TransferKind::Pull);
+    p.sync = Some(crate::transfer::sync_count::SyncChoice::from_tally(
+        Default::default(),
+    ));
+    let started = last_started(&p);
+    assert_eq!(started.kind, TransferKind::Sync);
+    assert_eq!(
+        (started.project, started.peer),
+        (uuid::Uuid::from_u128(3), uuid::Uuid::from_u128(3))
+    );
 }

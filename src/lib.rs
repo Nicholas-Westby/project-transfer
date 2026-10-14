@@ -4,6 +4,7 @@ pub mod address;
 pub mod commands;
 pub mod core;
 pub mod discovery;
+pub mod dock;
 pub mod identity;
 pub mod ignore_rules;
 pub mod logging;

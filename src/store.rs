@@ -57,6 +57,7 @@ impl Store {
             last_peer: None,
             theme: ThemeChoice::Dark,
             port: 0,
+            last_started: None,
         };
         self.save_instance(&settings)?;
         Ok(settings)

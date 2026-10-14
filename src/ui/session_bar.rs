@@ -136,6 +136,9 @@ impl App {
                     })
                     .inner;
                 if r.clicked() && !is_selected {
+                    // A computer chosen by hand replaces a Dock pick still
+                    // waiting for another.
+                    self.view.dock_pending = None;
                     self.act(Action::SelectPeer(p.peer.id));
                 }
             }

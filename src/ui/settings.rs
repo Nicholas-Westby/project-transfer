@@ -223,6 +223,7 @@ mod tests {
             last_peer: None,
             theme: ThemeChoice::Dark,
             port: 0,
+            last_started: None,
         }
     }
 

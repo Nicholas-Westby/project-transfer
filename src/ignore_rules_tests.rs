@@ -170,6 +170,7 @@ fn spec_from_settings_applies_removals_and_extras() {
         last_peer: None,
         theme: Default::default(),
         port: 0,
+        last_started: None,
     };
     let spec = IgnoreSpec::from_settings(&s);
     assert!(!spec.patterns.contains(&"bin/".to_string()));

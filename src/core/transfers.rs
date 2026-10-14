@@ -8,11 +8,13 @@ use super::progress;
 use super::state::TransferState;
 use super::transfer_words::{done_sentence, verb};
 use super::{Core, lock};
+use crate::model::{Direction, LastStarted, TransferKind};
 use crate::net::Connection;
 use crate::transfer::{self, Preview, TransferRequest};
 use anyhow::bail;
 use std::time::Instant;
 use tokio_util::sync::CancellationToken;
+use tracing::warn;
 
 /// The preview and the connection that built it live together, so a
 /// confirmed plan can only ever run over its own connection. Generic so the
@@ -180,8 +182,16 @@ impl Core {
         };
         let (tx, rx) = tokio::sync::mpsc::unbounded_channel();
         progress::follow(self.ui.clone(), rx, started);
+        let remembered = last_started(&preview);
         let core = self.clone();
         tokio::spawn(async move {
+            // Confirming is what the Dock menu offers to repeat.
+            if let Err(e) = core
+                .update_settings(|s| s.last_started = Some(remembered))
+                .await
+            {
+                warn!("could not remember this transfer for the Dock menu: {e:#}");
+            }
             let req = preview.request.clone();
             let link = preview.link.clone();
             let peer = core
@@ -192,6 +202,7 @@ impl Core {
             let result = transfer::execute(&mut conn, &core.shared, preview, tx, cancel).await;
             core.sync_projects().await;
             if let Some(l) = link {
+                core.follow_link(&l).await;
                 // Once the project has the new id, what the other computer
                 // has for it is filed under it too, until the next poll.
                 core.ui.update(|s| {
@@ -256,6 +267,20 @@ impl Core {
             s.transfer = TransferState::Idle;
             s.file_view = None;
         });
+    }
+}
+
+/// The transfer `p` runs, as the Dock menu repeats it.
+fn last_started(p: &Preview) -> LastStarted {
+    let kind = match (p.sync.is_some(), p.request.direction) {
+        (true, _) => TransferKind::Sync,
+        (false, Direction::Push) => TransferKind::Push,
+        (false, Direction::Pull) => TransferKind::Pull,
+    };
+    LastStarted {
+        kind,
+        project: p.request.project,
+        peer: p.request.peer,
     }
 }
 

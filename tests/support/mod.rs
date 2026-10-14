@@ -49,6 +49,7 @@ impl Instance {
             last_peer: None,
             theme: Default::default(),
             port: 0,
+            last_started: None,
         };
         let (tx, mut rx) = mpsc::unbounded_channel();
         let shared = Shared {

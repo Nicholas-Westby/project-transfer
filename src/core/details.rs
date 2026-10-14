@@ -45,6 +45,7 @@ impl Core {
             match result {
                 Ok(synced) => {
                     if let Some(l) = &synced.link {
+                        core.follow_link(l).await;
                         core.ui.info(format!(
                             "Matched {what} with the project `{}` {name} already has, so both \
                              computers now use the same folders for it.",

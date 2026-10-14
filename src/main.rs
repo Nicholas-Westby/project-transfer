@@ -5,6 +5,7 @@
 
 use eframe::egui;
 use project_transfer::core::AppCore;
+use project_transfer::dock::Dock;
 use project_transfer::store::Store;
 use project_transfer::ui::{App, RfdPicker, theme};
 use std::sync::Arc;
@@ -29,7 +30,11 @@ fn main() -> anyhow::Result<()> {
         Box::new(move |cc| {
             theme::install(&cc.egui_ctx);
             let core = AppCore::start(store, Some(cc.egui_ctx.clone()))?;
-            Ok(Box::new(App::new(Arc::new(core), Box::new(RfdPicker))))
+            // The window is open, so winit's app delegate, which the menu
+            // is added to, is in place.
+            let dock = Dock::install(&cc.egui_ctx);
+            let app = App::new(Arc::new(core), Box::new(RfdPicker)).with_dock(dock);
+            Ok(Box::new(app))
         }),
     )
     .map_err(|e| anyhow::anyhow!("the window could not open: {e}"))
