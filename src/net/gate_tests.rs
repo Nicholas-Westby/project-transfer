@@ -70,6 +70,15 @@ fn all_requests() -> Vec<(Request, Need)> {
                 multi_folder: false,
                 from_os: None,
                 home_hint: None,
+                name_ignored_dirs: true,
+            },
+            Need::PullOrPush,
+        ),
+        (
+            R::CountFiles {
+                project: u(),
+                folder: u(),
+                dirs: vec![],
             },
             Need::PullOrPush,
         ),

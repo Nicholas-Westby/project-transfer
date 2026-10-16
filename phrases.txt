@@ -106,6 +106,7 @@ ConfirmPairCode
 CoolThings
 CoreServices
 CornerRadius
+CountFiles
 CreateJobObjectW
 CreateProject
 CreateShortcut
@@ -149,6 +150,7 @@ fe80::4721:9d4c:2f7a:b09c
 febf::1
 fec0::1
 FileAsk
+FileCounts
 FileDialog
 FileHeader
 FilePart
@@ -287,6 +289,7 @@ PeerFolder
 PeerFolderDraft
 PeerView
 PendingFile
+PermissionDenied
 PermissionsExt
 PkgInfo
 PNGs

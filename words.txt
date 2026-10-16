@@ -22,10 +22,12 @@
 08-confirm-run
 09-computers
 09b-computers-through
+0a1b2c3d
 0f32
 0o000
 0o111
 0o444
+0o555
 0o600
 0o755
 0o777
@@ -375,6 +377,7 @@ be
 beat
 beats
 beaver
+became
 because
 become
 becomes
@@ -865,6 +868,7 @@ deletions
 deliberately
 delta
 deminiaturize
+denied
 dep
 depend
 dependencies
@@ -893,6 +897,7 @@ desk
 desktop
 dest
 destination
+destination's
 destructive
 detached
 details
@@ -1068,6 +1073,7 @@ engineer
 enough
 enter
 entered
+entering
 entirely
 entity
 entries
@@ -1422,6 +1428,7 @@ hashed
 hasher
 hashes
 hashing
+hasn't
 have
 haven't
 having
@@ -1698,6 +1705,7 @@ leave
 leaves
 leaving
 left
+leftover
 leftovers
 legal
 lemur
@@ -1745,6 +1753,7 @@ link-local
 links
 lint
 lints
+linux
 list
 list's
 listed
@@ -1752,6 +1761,7 @@ listen
 listener
 listening
 listens
+listing
 lists
 literal
 literals
@@ -2017,6 +2027,7 @@ nicholas
 nil
 nimble
 nlines
+nm
 no
 no-deps
 no-op
@@ -2046,6 +2057,7 @@ north
 not
 not-a-uuid
 note
+noted
 notes
 notes-link
 nothing
@@ -2145,6 +2157,7 @@ ours
 out
 outbound
 outer
+outermost
 outgoing
 output
 outside
@@ -2483,6 +2496,7 @@ reaches
 reaching
 read
 read-only
+readable
 reader
 readers
 reading
@@ -2593,6 +2607,7 @@ replaces
 replacing
 replies
 reply
+reply's
 repo
 report
 reported
@@ -2691,6 +2706,7 @@ roles
 rolling
 room
 root
+root-owned
 roots
 rotation
 rougher
@@ -3098,8 +3114,6 @@ survives
 surviving
 svg
 swap
-sweep
-sweeper
 swept
 swift
 switched
@@ -3248,6 +3262,7 @@ tool
 tooling
 tools
 top
+top-level
 topmost
 tops
 tort
@@ -3353,6 +3368,7 @@ units
 unix
 unknown
 unless
+unlike
 unmodified
 unnamed
 unpair
@@ -3428,6 +3444,7 @@ vec
 vec2
 vegetables
 velvet
+vendor
 verb
 verbose
 verification
@@ -3435,6 +3452,7 @@ verified
 verifier
 verify
 version
+version's
 versions
 vertical
 very
@@ -3462,6 +3480,8 @@ wait
 waiting
 waits
 walk
+walked
+walking
 walks
 walrus
 want

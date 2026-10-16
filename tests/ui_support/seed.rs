@@ -270,6 +270,7 @@ pub fn sample_preview(s: &UiState) -> Preview {
             "`aux.txt` is a reserved name on Windows.".into(),
         )],
         replaced: vec![],
+        leftovers: vec![],
     };
     let data = FolderPreview {
         folder: id(21),
@@ -283,6 +284,7 @@ pub fn sample_preview(s: &UiState) -> Preview {
         },
         skipped: vec![],
         replaced: vec![],
+        leftovers: vec![],
     };
     Preview {
         request: TransferRequest {

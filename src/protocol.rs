@@ -1,10 +1,7 @@
 //! Messages exchanged between instances and their length-prefixed framing.
 
 use crate::ignore_rules::IgnoreSpec;
-use crate::manifest::Manifest;
-use crate::model::{
-    Command, Description, FolderId, InstanceId, Os, Permissions, Project, ProjectId,
-};
+use crate::model::{Command, FolderId, InstanceId, Os, Permissions, Project, ProjectId};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::net::IpAddr;
@@ -12,6 +9,10 @@ use std::net::IpAddr;
 #[path = "protocol_framing.rs"]
 mod framing;
 pub use framing::{read_msg, read_msg_limited, write_msg};
+
+#[path = "protocol_types.rs"]
+mod types;
+pub use types::{FolderScan, ProjectSummary, Reachable, RemoteFolder, RemoteProject};
 
 pub const PROTOCOL_VERSION: u32 = 3;
 const MAX_MSG: u32 = 64 * 1024 * 1024;
@@ -84,6 +85,12 @@ pub enum Request {
         /// which a computer without a path for it uses when it is free.
         #[serde(default)]
         home_hint: Option<String>,
+        /// Ignored folders come back named in `ignored_dirs` rather than
+        /// counted, since counting walks all of them; the asker counts the
+        /// few a removal needs with `CountFiles`. Older versions don't ask,
+        /// and get every one counted.
+        #[serde(default)]
+        name_ignored_dirs: bool,
     },
     /// Hashes of files in the folder the same connection last scanned, or the
     /// responder's own folder.
@@ -91,6 +98,14 @@ pub enum Request {
         project: ProjectId,
         folder: FolderId,
         paths: Vec<String>,
+    },
+    /// The files at any depth in each of `dirs`, folders inside the folder
+    /// `Hashes` would read. Answered with `FileCounts`. Sent only to a
+    /// computer whose scan named its ignored folders, which knows it.
+    CountFiles {
+        project: ProjectId,
+        folder: FolderId,
+        dirs: Vec<String>,
     },
     /// Pull: the reply is `FileHeader` followed by raw bytes.
     GetFile {
@@ -183,6 +198,7 @@ impl Request {
             Request::ProjectInfo { .. } => "ProjectInfo",
             Request::Manifest { .. } => "Manifest",
             Request::Hashes { .. } => "Hashes",
+            Request::CountFiles { .. } => "CountFiles",
             Request::GetFile { .. } => "GetFile",
             Request::ReadFile { .. } => "ReadFile",
             Request::BeginPush { .. } => "BeginPush",
@@ -227,6 +243,8 @@ pub enum Response {
     ProjectInfo(Option<RemoteProject>),
     Manifest(FolderScan),
     Hashes(HashMap<String, String>),
+    /// How many files each folder `CountFiles` asked about holds, by path.
+    FileCounts(HashMap<String, u64>),
     FileHeader {
         size: u64,
         mtime_ms: i64,
@@ -245,59 +263,6 @@ pub enum Response {
     Refused {
         reason: String,
     },
-}
-
-/// A folder as the responder sees it.
-#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
-pub struct FolderScan {
-    pub manifest: Manifest,
-    /// For display only; never used to resolve a path.
-    pub path: String,
-    pub exists: bool,
-    /// False when the responder has no path stored for the folder and
-    /// `path` is where a push would create it.
-    pub set_up: bool,
-    pub os: Os,
-}
-
-#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
-pub struct ProjectSummary {
-    pub id: ProjectId,
-    pub name: String,
-}
-
-#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
-pub struct Reachable {
-    pub id: InstanceId,
-    pub name: String,
-}
-
-#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
-pub struct RemoteProject {
-    pub name: String,
-    pub folders: Vec<RemoteFolder>,
-    pub primary: FolderId,
-    /// Missing from computers that don't have descriptions yet.
-    #[serde(default)]
-    pub description: Description,
-    /// Whether the answering computer's latest transfer of this project
-    /// was with the asking one. Missing from older versions.
-    #[serde(default)]
-    pub last_with_you: bool,
-}
-
-#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
-pub struct RemoteFolder {
-    pub id: FolderId,
-    pub name: String,
-    /// For display only; never used to resolve a path.
-    pub path: Option<String>,
-    /// As `Request::Manifest::home_hint`, from the answering computer.
-    #[serde(default)]
-    pub home_hint: Option<String>,
-    /// `path` with `~` for the answering computer's home, for display.
-    #[serde(default)]
-    pub shown: Option<String>,
 }
 
 #[cfg(test)]

@@ -4,7 +4,7 @@
 
 use super::prepare::unexpected;
 use super::preview::{FolderPreview, LeftOut, Replaced, drop_unholdable, replaced_folders};
-use super::safe_join;
+use super::{ignored, safe_join};
 use crate::ignore_rules::{IgnoreSpec, Matcher};
 use crate::manifest::{Kind, Manifest, compare, compose_for, hash_file, resolve_hashes, scan};
 use crate::model::{FolderId, Os, ProjectId};
@@ -13,6 +13,7 @@ use crate::protocol::{FolderScan, Request, Response};
 use anyhow::Context;
 use std::collections::HashMap;
 use std::path::PathBuf;
+use std::time::Instant;
 use tracing::info;
 
 /// One folder's hashes of the files whose sizes match but whose times
@@ -83,6 +84,7 @@ impl Ctx<'_> {
             multi_folder: ask.multi,
             from_os: Some(Os::current()),
             home_hint: ask.hint,
+            name_ignored_dirs: true,
         };
         match self.conn.request(&req).await? {
             Response::Manifest(mut s) => {
@@ -107,6 +109,9 @@ impl Ctx<'_> {
         }
         let spec = self.spec.clone();
         let shown = root.display().to_string();
+        // Counts no ignored folder up front, unlike a scan for another
+        // computer: a pull counts those it needs here by any name, and a
+        // push never reads the counts of the copy it sends.
         let mut m =
             tokio::task::spawn_blocking(move || scan(&root, &Matcher::new(&spec)?, compose))
                 .await?
@@ -147,7 +152,51 @@ impl Ctx<'_> {
         Ok((local, remote))
     }
 
-    pub(super) async fn plan(&mut self, s: Sides) -> anyhow::Result<FolderPreview> {
+    /// Counts the files in the destination's ignored folders that a removed
+    /// or replaced folder takes along; the scans only named them.
+    async fn count_ignored(&mut self, s: &mut Sides) -> anyhow::Result<()> {
+        let dirs = ignored::needed(&s.src.0, &s.dst.0);
+        if dirs.is_empty() {
+            return Ok(());
+        }
+        let counts = if s.local_is_src {
+            let req = Request::CountFiles {
+                project: self.project,
+                folder: s.folder,
+                dirs,
+            };
+            match self.conn.request(&req).await? {
+                Response::FileCounts(c) => c,
+                other => return Err(unexpected(self.conn, "the file count", other)),
+            }
+        } else {
+            let (root, asked, started) = (s.local_root.clone(), dirs.len(), Instant::now());
+            let counted = tokio::task::spawn_blocking(move || ignored::count_own(&root, &dirs));
+            let counts = counted
+                .await?
+                .map_err(|e| anyhow::anyhow!(ignored::count_failed(&e, "this computer")))?;
+            info!(
+                "looked inside {} ignored folders of {} for a pull from {}: {} files in {:.1} s",
+                asked,
+                s.dst.1,
+                self.conn.peer_name(),
+                counts.values().sum::<u64>(),
+                started.elapsed().as_secs_f64()
+            );
+            counts
+        };
+        ignored::add_counts(&mut s.dst.0, &counts);
+        Ok(())
+    }
+
+    pub(super) async fn plan(&mut self, mut s: Sides) -> anyhow::Result<FolderPreview> {
+        self.count_ignored(&mut s).await?;
+        // The scan here noted them; the other computer keeps its own.
+        let leftovers = if s.local_is_src {
+            Vec::new()
+        } else {
+            std::mem::take(&mut s.dst.0.leftovers)
+        };
         let (src, dst) = (&s.src.0, &s.dst.0);
         let mut plan = compare(src, dst);
         if !plan.needs_hash.is_empty() {
@@ -182,6 +231,7 @@ impl Ctx<'_> {
             plan,
             skipped,
             replaced,
+            leftovers,
         })
     }
 }
@@ -233,7 +283,7 @@ mod tests {
                 rel: "install".into(),
                 kind,
             }],
-            ignored_in_dir: Default::default(),
+            ..Default::default()
         }
     }
 

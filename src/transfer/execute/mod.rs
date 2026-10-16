@@ -7,7 +7,7 @@ use super::projects::{
     StartedBy, adopt, exchange_commands, record_transfer, update_projects, wire_commands,
     wire_project,
 };
-use super::{Applier, Progress, Summary};
+use super::{Applier, Progress, Summary, clear_leftovers};
 use crate::logging::one_line;
 use crate::manifest::{Change, Entry, Kind};
 use crate::model::{Direction, Folder, Project};
@@ -128,10 +128,10 @@ impl Run<'_> {
                     let root = PathBuf::from(&fp.dest_path);
                     std::fs::create_dir_all(&root)
                         .with_context(|| format!("Could not create {}", root.display()))?;
-                    let sweeper = Applier::new(root.clone());
-                    // Leftovers are only clutter, never sent, so a failed
-                    // sweep must not stop the transfer.
-                    match tokio::task::spawn_blocking(move || sweeper.sweep_temp()).await {
+                    // Leftovers are only clutter, never sent, so failing to
+                    // clear them must not stop the transfer.
+                    let (at, found) = (root.clone(), fp.leftovers.clone());
+                    match tokio::task::spawn_blocking(move || clear_leftovers(&at, &found)).await {
                         Ok(Ok(_)) => {}
                         Ok(Err(e)) => warn!(
                             "could not clear unfinished files in {}: {e}",

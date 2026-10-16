@@ -33,6 +33,7 @@ fn preview(direction: Direction, changes: Vec<Change>) -> Preview {
             },
             skipped: vec![("aux.txt".into(), "`aux.txt` is reserved on Windows.".into())],
             replaced: vec![],
+            leftovers: vec![],
         }],
         left_out: Vec::new(),
         warnings: vec![],

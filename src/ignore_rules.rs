@@ -28,7 +28,7 @@ pub const DEFAULT_IGNORES: &[&str] = &[
 ];
 
 /// Suffix of the half-written files a transfer leaves behind; never sent.
-const TEMP_SUFFIX: &str = ".pt-tmp";
+pub(crate) const TEMP_SUFFIX: &str = ".pt-tmp";
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Default)]
 pub struct IgnoreSpec {

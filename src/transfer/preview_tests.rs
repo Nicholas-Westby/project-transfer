@@ -31,6 +31,7 @@ fn man(mut entries: Vec<Entry>, ignored: &[(&str, u64)]) -> Manifest {
     Manifest {
         entries,
         ignored_in_dir: ignored.iter().map(|(k, v)| (k.to_string(), *v)).collect(),
+        ..Default::default()
     }
 }
 
@@ -64,6 +65,7 @@ fn preview(plans: Vec<Plan>) -> Preview {
                 plan,
                 skipped: vec![],
                 replaced: vec![],
+                leftovers: vec![],
             })
             .collect(),
         left_out: Vec::new(),

@@ -77,6 +77,7 @@ fn a_pull_reads_this_computers_copy_in_the_destination() {
             plan: Default::default(),
             skipped: vec![],
             replaced: vec![],
+            leftovers: vec![],
         }],
         left_out: vec![],
         warnings: vec![],

@@ -7,7 +7,7 @@ use crate::net::NetEvent;
 use crate::protocol::{Request, Response};
 use crate::transfer::home::resolve_all;
 use crate::transfer::projects::{StartedBy, adopt, record_transfer, update_projects};
-use crate::transfer::{Applier, Op, validate_name, validate_rel};
+use crate::transfer::{Applier, Op, clear_leftovers, validate_name, validate_rel};
 use std::collections::HashMap;
 use std::path::PathBuf;
 use std::time::Instant;
@@ -153,11 +153,14 @@ async fn begin(
         return refused(format!("Could not create {}: {e}", root.display()));
     }
     let applier = Applier::new(root.clone());
-    let swept = {
-        let sweeper = Applier::new(root.clone());
-        tokio::task::spawn_blocking(move || sweeper.sweep_temp()).await
+    // The preview's scan found them, so nothing walks the folder again.
+    let found = state.leftovers.remove(&(project.id, folder));
+    let cleared = {
+        let root = root.clone();
+        let found = found.unwrap_or_default();
+        tokio::task::spawn_blocking(move || clear_leftovers(&root, &found)).await
     };
-    match swept {
+    match cleared {
         Ok(Ok(0)) => {}
         Ok(Ok(n)) => info!("removed {n} unfinished files left in {}", root.display()),
         Ok(Err(e)) => warn!(

@@ -43,6 +43,7 @@ async fn a_push_from_windows_keeps_the_bit_here() {
             multi_folder: false,
             from_os: Some(from_os),
             home_hint: None,
+            name_ignored_dirs: true,
         };
         let answer = conn.request(&scan).await.unwrap();
         assert!(matches!(answer, Response::Manifest(_)), "{answer:?}");

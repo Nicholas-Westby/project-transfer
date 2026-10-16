@@ -15,7 +15,7 @@ fn file(rel: &str, size: u64, mtime_ms: i64) -> Entry {
 fn folder(entries: Vec<Entry>) -> Manifest {
     Manifest {
         entries,
-        ignored_in_dir: Default::default(),
+        ..Default::default()
     }
 }
 

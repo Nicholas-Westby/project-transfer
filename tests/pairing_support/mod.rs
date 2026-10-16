@@ -141,6 +141,7 @@ pub fn manifest_req() -> Request {
         multi_folder: false,
         from_os: None,
         home_hint: None,
+        name_ignored_dirs: true,
     }
 }
 

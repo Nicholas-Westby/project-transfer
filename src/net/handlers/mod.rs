@@ -4,12 +4,12 @@
 
 use super::Shared;
 use crate::ignore_rules::Matcher;
-use crate::manifest::{compose_for, hash_file, scan};
+use crate::manifest::compose_for;
 use crate::model::{FolderId, Os, Peer, ProjectId};
 use crate::protocol::{FolderScan, Request, Response, write_msg};
 use crate::transfer::home::resolve;
+use crate::transfer::ignored;
 use crate::transfer::projects::{default_path, exchange_commands, wire_commands};
-use crate::transfer::safe_join;
 use std::collections::HashMap;
 use std::net::SocketAddr;
 use std::path::PathBuf;
@@ -21,6 +21,7 @@ mod details;
 mod peek;
 mod pull;
 mod push;
+mod scanned;
 
 pub struct Ctx<'a> {
     pub shared: &'a Shared,
@@ -36,6 +37,10 @@ pub struct SessionState {
     /// Folders this connection scanned, so `Hashes` reads the same place
     /// even for a folder this computer has not set up yet.
     roots: HashMap<(ProjectId, FolderId), PathBuf>,
+    /// Temp files those scans found an unfinished transfer left, which a
+    /// push into the folder clears without walking it again. A push on a
+    /// connection that never scanned the folder clears none.
+    leftovers: HashMap<(ProjectId, FolderId), Vec<PathBuf>>,
     /// What the asking computer runs, as it said when it asked for a folder
     /// scan; older versions don't say.
     peer_os: Option<Os>,
@@ -61,6 +66,7 @@ pub async fn handle<S: AsyncRead + AsyncWrite + Unpin + Send>(
             multi_folder,
             from_os,
             home_hint,
+            name_ignored_dirs,
         } => {
             let names = Names {
                 project: &project_name,
@@ -68,13 +74,23 @@ pub async fn handle<S: AsyncRead + AsyncWrite + Unpin + Send>(
                 multi: multi_folder,
                 hint: home_hint.as_deref(),
             };
-            manifest(ctx, state, project, folder, names, ignore, from_os).await
+            let listing = Listing {
+                ignore,
+                from_os,
+                name_ignored_dirs,
+            };
+            manifest(ctx, state, project, folder, names, listing).await
         }
         Request::Hashes {
             project,
             folder,
             paths,
-        } => hashes(ctx, state, project, folder, paths).await,
+        } => scanned::hashes(ctx, state, project, folder, paths).await,
+        Request::CountFiles {
+            project,
+            folder,
+            dirs,
+        } => scanned::count_files(ctx, state, project, folder, dirs).await,
         Request::ExchangeCommands { project, commands } => {
             match exchange_commands(ctx.shared, project, &wire_commands(&commands)).await {
                 Ok(merged) => Response::Commands(merged),
@@ -155,14 +171,20 @@ struct Names<'a> {
     hint: Option<&'a str>,
 }
 
+/// How the asking computer wants its folder listed.
+struct Listing {
+    ignore: crate::ignore_rules::IgnoreSpec,
+    from_os: Option<Os>,
+    name_ignored_dirs: bool,
+}
+
 async fn manifest(
     ctx: &Ctx<'_>,
     state: &mut SessionState,
     project: ProjectId,
     folder: FolderId,
     names: Names<'_>,
-    ignore: crate::ignore_rules::IgnoreSpec,
-    from_os: Option<Os>,
+    listing: Listing,
 ) -> Response {
     let started = Instant::now();
     // Before the scan: a file made after it never travels with this transfer.
@@ -194,14 +216,23 @@ async fn manifest(
             }
         }
     };
-    let matcher = match Matcher::new(&ignore) {
+    let matcher = match Matcher::new(&listing.ignore) {
         Ok(m) => m,
         Err(e) => return refused(format!("The ignore list is not valid: {e:#}")),
     };
     let scan_root = root.clone();
-    let compose = from_os.is_some_and(compose_for);
-    let scanned = tokio::task::spawn_blocking(move || scan(&scan_root, &matcher, compose)).await;
-    let manifest = match scanned {
+    let compose = listing.from_os.is_some_and(compose_for);
+    let named = listing.name_ignored_dirs;
+    let scanned = tokio::task::spawn_blocking(move || {
+        let mut m = ignored::scan(&scan_root, &matcher, compose)?;
+        // An older version's preview counts on every ignored file in these.
+        if !named {
+            ignored::count_all(&scan_root, &mut m)?;
+        }
+        anyhow::Ok(m)
+    })
+    .await;
+    let mut manifest = match scanned {
         Ok(Ok(m)) => m,
         Ok(Err(e)) => return refused(format!("Could not read {}: {e:#}", root.display())),
         Err(e) => return refused(format!("Scanning {} stopped: {e}", root.display())),
@@ -217,7 +248,9 @@ async fn manifest(
         if set_up { "" } else { ", not set up here yet" }
     );
     state.roots.insert((project, folder), root.clone());
-    state.peer_os = from_os;
+    let leftovers = std::mem::take(&mut manifest.leftovers);
+    state.leftovers.insert((project, folder), leftovers);
+    state.peer_os = listing.from_os;
     Response::Manifest(FolderScan {
         manifest,
         path: root.display().to_string(),
@@ -225,37 +258,4 @@ async fn manifest(
         set_up,
         os: Os::current(),
     })
-}
-
-async fn hashes(
-    ctx: &Ctx<'_>,
-    state: &SessionState,
-    project: ProjectId,
-    folder: FolderId,
-    paths: Vec<String>,
-) -> Response {
-    let root = match stored_root(ctx.shared, project, folder).await {
-        Some(r) => r,
-        None => match state.roots.get(&(project, folder)) {
-            Some(r) => r.clone(),
-            None => return Response::Hashes(HashMap::new()),
-        },
-    };
-    let done = tokio::task::spawn_blocking(move || {
-        // A path that is not allowed or not a plain file gets no hash, which
-        // keeps it a full update.
-        paths
-            .into_iter()
-            .filter_map(|rel| {
-                let p = safe_join(&root, &rel).ok()?;
-                std::fs::symlink_metadata(&p)
-                    .ok()?
-                    .is_file()
-                    .then_some(())?;
-                Some((rel, hash_file(&p).ok()?))
-            })
-            .collect()
-    })
-    .await;
-    Response::Hashes(done.unwrap_or_default())
 }

@@ -41,6 +41,7 @@ fn folder(name: &str, changes: Vec<Change>, replaced: Vec<Replaced>) -> FolderPr
         },
         skipped: vec![("aux.txt".into(), "reserved".into())],
         replaced,
+        leftovers: vec![],
     }
 }
 

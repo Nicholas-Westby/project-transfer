@@ -96,3 +96,14 @@ fn a_project_from_an_older_version_was_not_last_moved_with_us() {
     let info: RemoteProject = serde_json::from_str(older).unwrap();
     assert!(!info.last_with_you);
 }
+
+#[test]
+fn a_scan_from_an_older_version_names_no_ignored_folders() {
+    let older = r#"{"Manifest":{"manifest":{"entries":[],"ignored_in_dir":{"":3}},
+        "path":"/x/app","exists":true,"set_up":true,"os":"MacOs"}}"#;
+    let Response::Manifest(scan) = serde_json::from_str(older).unwrap() else {
+        panic!("not a folder scan");
+    };
+    assert!(scan.manifest.ignored_dirs.is_empty());
+    assert_eq!(scan.manifest.ignored_in_dir.get(""), Some(&3));
+}

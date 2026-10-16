@@ -259,21 +259,27 @@ async fn pull_continues_when_clearing_old_temp_files_fails() {
     use std::os::unix::fs::PermissionsExt;
     let (a, b) = pair_full().await;
     let theirs = b.project_dir("beds");
-    write(&theirs, "plan.txt", "new");
+    write(&theirs, "plan.txt", "old");
+    write(&theirs, "rows/a.txt", "a");
     let p = b.add_project("Orchard", &[("beds", &theirs)]).await;
+    pull(&a, &b, p.id).await;
+    let mine = a.dev().join("beds");
+    write(&mine, "rows/a.txt.0a1b2c3d.pt-tmp", "half");
+    write(&theirs, "plan.txt", "new plan");
     let mut conn = a.open(&b).await;
     let req = a.request(&b, p.id, Direction::Pull).await;
     let preview = transfer::prepare(&mut conn, &a.shared, req).await.unwrap();
-    // Appears after the preview, so only the sweep trips over it.
-    let locked = a.dev().join("beds/locked");
-    std::fs::create_dir_all(&locked).unwrap();
-    std::fs::set_permissions(&locked, std::fs::Permissions::from_mode(0o000)).unwrap();
+    // The preview found the temp file. A folder this computer can no longer
+    // write to then keeps the pull from removing it.
+    let rows = mine.join("rows");
+    std::fs::set_permissions(&rows, std::fs::Permissions::from_mode(0o555)).unwrap();
     let (tx, _rx) = tokio::sync::mpsc::unbounded_channel();
     let result = transfer::execute(&mut conn, &a.shared, preview, tx, Default::default()).await;
-    std::fs::set_permissions(&locked, std::fs::Permissions::from_mode(0o755)).unwrap();
+    std::fs::set_permissions(&rows, std::fs::Permissions::from_mode(0o755)).unwrap();
     let summary = result.unwrap();
     assert_eq!(summary.files, 1);
-    assert_eq!(read(&a.dev().join("beds"), "plan.txt"), "new");
+    assert_eq!(read(&mine, "plan.txt"), "new plan");
+    assert_eq!(temps(&mine), ["rows/a.txt.0a1b2c3d.pt-tmp"]);
 }
 
 #[tokio::test]

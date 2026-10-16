@@ -2,6 +2,7 @@
 
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
+use std::path::PathBuf;
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
 pub enum Kind {
@@ -29,7 +30,18 @@ pub struct Manifest {
     pub entries: Vec<Entry>,
     /// Ignored files under each existing directory ("" is the root), so a
     /// removed directory can report how many ignored files go with it.
+    /// Files inside the folders in `ignored_dirs` are added once counted.
     pub ignored_in_dir: BTreeMap<String, u64>,
+    /// Ignored folders, sorted. A scan doesn't look inside them: counting
+    /// their files walked all of them, though a transfer only needs the few
+    /// that a removed folder takes along (see `transfer::ignored`). Older
+    /// versions count every one instead and name none.
+    #[serde(default)]
+    pub ignored_dirs: Vec<String>,
+    /// Temp files an unfinished transfer left, as paths on this computer,
+    /// for the next transfer into the folder to remove. Never sent.
+    #[serde(skip)]
+    pub leftovers: Vec<PathBuf>,
 }
 
 mod compare;

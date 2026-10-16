@@ -57,10 +57,12 @@ pub fn need(req: &Request) -> Need {
         R::Status | R::Relay { .. } => Need::Paired,
         // A push preview reads the receiver's project and manifest, and
         // commands are exchanged on both push and pull.
-        // Hashes too: a push preview hashes the receiver's copies.
+        // Hashes too: a push preview hashes the receiver's copies, and
+        // counts the files a folder it removes there takes along.
         R::ProjectInfo { .. }
         | R::Manifest { .. }
         | R::Hashes { .. }
+        | R::CountFiles { .. }
         | R::ExchangeCommands { .. } => Need::PullOrPush,
         // Reading a file to show it hands over its content, as a pull does.
         R::GetFile { .. } | R::ReadFile { .. } | R::EndPull { .. } => Need::Pull,

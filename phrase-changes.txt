@@ -1,11 +1,3 @@
-+beginActivityWithOptions
-+endActivity
-+IdleDisplaySleepDisabled
-+IdleSystemSleepDisabled
-+NoNap
-+NSActivityOptions
-+NSObjectProtocol
-+NSProcessInfo
-+processInfo
-+ProtocolObject
-+UserInitiatedAllowingIdleSystemSleep
++CountFiles
++FileCounts
++PermissionDenied

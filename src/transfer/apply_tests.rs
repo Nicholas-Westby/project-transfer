@@ -201,21 +201,6 @@ fn removing_another_spelling_of_a_link_just_made_keeps_it() {
 }
 
 #[test]
-fn sweep_deletes_stray_temps_anywhere() {
-    let t = tempfile::tempdir().unwrap();
-    std::fs::create_dir_all(t.path().join("a/b")).unwrap();
-    std::fs::write(t.path().join("a/b/f.1234.pt-tmp"), "x").unwrap();
-    std::fs::write(t.path().join("g.9.pt-tmp"), "x").unwrap();
-    std::fs::write(t.path().join("keep.txt"), "x").unwrap();
-    let a = Applier::new(t.path().to_path_buf());
-    assert_eq!(a.sweep_temp().unwrap(), 2);
-    assert_eq!(names(t.path()), ["a", "keep.txt"]);
-    assert!(names(&t.path().join("a/b")).is_empty());
-    let missing = Applier::new(t.path().join("nope"));
-    assert_eq!(missing.sweep_temp().unwrap(), 0);
-}
-
-#[test]
 fn invalid_rel_is_refused_by_every_operation() {
     let t = tempfile::tempdir().unwrap();
     let inner = t.path().join("root");

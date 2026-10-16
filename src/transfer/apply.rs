@@ -1,6 +1,7 @@
 //! Writes a mirror to disk without ever leaving a half-written file.
 
 use super::paths::{invalid, safe_join};
+use crate::ignore_rules::TEMP_SUFFIX;
 use crate::manifest::is_exec;
 use std::collections::HashSet;
 use std::fs::File;
@@ -9,7 +10,6 @@ use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex, MutexGuard};
 use tracing::info;
 
-const TEMP_SUFFIX: &str = ".pt-tmp";
 /// Keeps "<name>.<rand>.pt-tmp" under the usual 255-byte name limit.
 const TEMP_NAME_KEEP: usize = 200;
 
@@ -227,27 +227,6 @@ impl Applier {
             return Ok(());
         }
         clear(&path)
-    }
-
-    pub fn sweep_temp(&self) -> io::Result<u64> {
-        fn walk(dir: &Path) -> io::Result<u64> {
-            let mut n = 0;
-            for item in std::fs::read_dir(dir)? {
-                let item = item?;
-                let ft = item.file_type()?;
-                if ft.is_dir() {
-                    n += walk(&item.path())?;
-                } else if item.file_name().to_string_lossy().ends_with(TEMP_SUFFIX) {
-                    std::fs::remove_file(item.path())?;
-                    n += 1;
-                }
-            }
-            Ok(n)
-        }
-        if !self.root.is_dir() {
-            return Ok(0);
-        }
-        walk(&self.root)
     }
 }
 

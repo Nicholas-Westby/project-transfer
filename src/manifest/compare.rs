@@ -173,6 +173,7 @@ mod tests {
         Manifest {
             entries,
             ignored_in_dir: ignored.iter().map(|(k, v)| (k.to_string(), *v)).collect(),
+            ..Default::default()
         }
     }
 

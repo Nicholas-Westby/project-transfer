@@ -256,6 +256,6 @@ fn kept(m: &Manifest, usual: &Matcher) -> Manifest {
             .filter(|e| !usual.leaves_out_with(&e.rel, e.kind == Kind::Dir, &mut seen))
             .cloned()
             .collect(),
-        ignored_in_dir: Default::default(),
+        ..Default::default()
     }
 }

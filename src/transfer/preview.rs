@@ -51,6 +51,10 @@ pub struct FolderPreview {
     /// Destination entries that writing the source removes without a
     /// removal line of their own, such as a folder replaced by a file.
     pub replaced: Vec<Replaced>,
+    /// Temp files an unfinished transfer left in this computer's copy, for
+    /// a pull to clear before it writes. Empty for a push, whose receiver
+    /// clears its own.
+    pub leftovers: Vec<std::path::PathBuf>,
 }
 
 #[derive(Clone, Debug, PartialEq)]

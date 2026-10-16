@@ -108,6 +108,7 @@ async fn a_mac_lists_the_composed_name_only_for_a_computer_that_is_not_a_mac() {
             multi_folder: false,
             from_os,
             home_hint: None,
+            name_ignored_dirs: true,
         };
         let Response::Manifest(scan) = conn.request(&ask).await.unwrap() else {
             panic!("no folder scan when asked as {from_os:?}");
