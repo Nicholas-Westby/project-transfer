@@ -102,6 +102,7 @@ async fn begin(
     project: Project,
     landing: Landing<'_>,
 ) -> Response {
+    let setup = Instant::now();
     let Landing {
         folder,
         expected_path,
@@ -172,7 +173,12 @@ async fn begin(
         Some(p) if p.project == project.id => (p.files, p.bytes, p.failed, p.started),
         _ => (0, 0, 0, Instant::now()),
     };
-    info!("{} began pushing to {}", ctx.peer.name, root.display());
+    info!(
+        "{} began pushing to {}; setup took {:.1} s",
+        ctx.peer.name,
+        root.display(),
+        setup.elapsed().as_secs_f64()
+    );
     state.push = Some(PushState {
         project: project.id,
         applier,

@@ -13,6 +13,7 @@ use crate::transfer::safe_join;
 use std::collections::HashMap;
 use std::net::SocketAddr;
 use std::path::PathBuf;
+use std::time::Instant;
 use tokio::io::{AsyncRead, AsyncWrite};
 use tracing::info;
 
@@ -163,6 +164,7 @@ async fn manifest(
     ignore: crate::ignore_rules::IgnoreSpec,
     from_os: Option<Os>,
 ) -> Response {
+    let started = Instant::now();
     // Before the scan: a file made after it never travels with this transfer.
     state
         .scanned_ms
@@ -204,12 +206,14 @@ async fn manifest(
         Ok(Err(e)) => return refused(format!("Could not read {}: {e:#}", root.display())),
         Err(e) => return refused(format!("Scanning {} stopped: {e}", root.display())),
     };
-    // A preview the other computer shows is built from this; say what it saw.
+    // A preview the other computer shows is built from this; say what it saw
+    // and how long that took.
     info!(
-        "{} looked at {} for a preview: {} entries{}",
+        "{} looked at {} for a preview: {} entries in {:.1} s{}",
         ctx.peer.name,
         root.display(),
         manifest.entries.len(),
+        started.elapsed().as_secs_f64(),
         if set_up { "" } else { ", not set up here yet" }
     );
     state.roots.insert((project, folder), root.clone());

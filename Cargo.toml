@@ -11,7 +11,7 @@ debug = false
 
 [package]
 name = "project-transfer"
-version = "0.1.79"
+version = "0.1.80"
 edition = "2024"
 description = "Mirror project folders between computers on a LAN"
 
@@ -73,7 +73,7 @@ system-configuration-sys = "0.6"
 core-foundation = "0.10"
 objc2 = "0.6"
 objc2-app-kit = { version = "0.3", default-features = false, features = ["std", "NSApplication", "NSMenu", "NSMenuItem", "NSResponder", "NSWindow"] }
-objc2-foundation = { version = "0.3", default-features = false, features = ["std", "NSArray", "NSString"] }
+objc2-foundation = { version = "0.3", default-features = false, features = ["std", "NSArray", "NSProcessInfo", "NSString"] }
 
 [target.'cfg(windows)'.dependencies]
 windows-sys = { version = "0.61", features = [

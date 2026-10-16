@@ -12,6 +12,7 @@ pub mod manifest;
 pub mod merge;
 pub mod model;
 pub mod naming;
+pub mod nap;
 pub mod net;
 pub mod protocol;
 pub mod store;

@@ -6,6 +6,7 @@
 use eframe::egui;
 use project_transfer::core::AppCore;
 use project_transfer::dock::Dock;
+use project_transfer::nap::NoNap;
 use project_transfer::store::Store;
 use project_transfer::ui::{App, RfdPicker, theme};
 use std::sync::Arc;
@@ -14,6 +15,8 @@ fn main() -> anyhow::Result<()> {
     let store = Store::open_default()?;
     // Keeping the guard alive keeps the log file writer flushing.
     let _log = project_transfer::logging::init(&store.logs_dir())?;
+    // Other computers call at any time, also while the window is hidden.
+    let _no_nap = NoNap::hold();
     let icon = eframe::icon_data::from_png_bytes(include_bytes!("../assets/icon.png"))
         .map_err(|e| anyhow::anyhow!("the built-in icon is not a valid PNG: {e}"))?;
     let options = eframe::NativeOptions {

@@ -58,6 +58,7 @@ AtomicU64
 AtomicUsize
 BadCharOnWindows
 BaseDirs
+beginActivityWithOptions
 BeginPush
 BTreeMap
 BTreeSet
@@ -127,6 +128,7 @@ DockItem
 DTDs
 DuplexStream
 EditCommand
+endActivity
 EndPull
 EndPush
 EnvFilter
@@ -174,6 +176,8 @@ HashSet
 hooksPath
 IcoEncoder
 IcoFrame
+IdleDisplaySleepDisabled
+IdleSystemSleepDisabled
 IgnoreSpec
 IndexedRandom
 initWithTitle
@@ -229,12 +233,14 @@ NetEvent
 NewProject
 NodeT
 NoKnownAddress
+NoNap
 NonInteractive
 NoPicker
 NoProfile
 NotADirectory
 NotFound
 NotThePairedComputer
+NSActivityOptions
 NSApplication
 NSArray
 NSBonjourServices
@@ -243,7 +249,9 @@ NSLocalNetworkUsageDescription
 NSMenu
 NSMenuItem
 NSObject
+NSObjectProtocol
 NSPrincipalClass
+NSProcessInfo
 NSResponder
 NSString
 NSWindow
@@ -290,6 +298,7 @@ PrepareSync
 PretendWinitDelegate
 PrivateKeyDer
 PrivatePkcs8KeyDer
+processInfo
 ProgressBar
 ProjectId
 ProjectInfo
@@ -298,6 +307,7 @@ ProjectSummary
 projectTransferDockItem
 PromptState
 PropertyList-1
+ProtocolObject
 PSScriptRoot
 PullOrPush
 PushState
@@ -405,6 +415,7 @@ UnboundedSender
 UnexpectedEof
 UnixTime
 UserDirs
+UserInitiatedAllowingIdleSystemSleep
 VecDeque
 ViewportBuilder
 WaitAnswer

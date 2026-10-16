@@ -119,6 +119,7 @@
 672c
 7d8b6c1e-2f4a-4b5c-9d6e-0f1a2b3c4d5e
 7u8
+850-entry
 8a9e
 a
 a's
@@ -202,6 +203,7 @@ allocating
 allocator
 allow
 allowed
+allowing
 allows
 alone
 along
@@ -334,6 +336,7 @@ await
 awaited
 awaiting
 awaits
+awake
 away
 axis
 b
@@ -774,6 +777,7 @@ counting
 counts
 cover
 coverage
+covered
 covers
 cow
 coyote
@@ -1549,6 +1553,7 @@ info
 infos
 inherited
 init
+initiated
 initiator
 initiator's
 initiator-then-responder
@@ -1582,6 +1587,7 @@ interface
 interfaces
 intermediates
 interrupted
+intersects
 into
 invalid
 invites
@@ -1792,6 +1798,7 @@ lower
 lowercase
 lowercased
 lowercases
+lowest
 lpt
 lpt1
 lpt9
@@ -1963,6 +1970,8 @@ named
 names
 naming
 nanoseconds
+nap
+napping
 narrow
 narrowed
 narrower
@@ -2355,6 +2364,7 @@ principal
 print
 printf
 println
+priority
 private
 private-network
 prn
