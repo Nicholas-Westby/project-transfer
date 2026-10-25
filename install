@@ -1,14 +1,45 @@
 #!/bin/sh
-# Builds Project Transfer and installs it in Applications. Any arguments go to
-# the installer, for example: ./install --dest ~/Desktop/test-install
+# Builds Project Transfer and installs it in Applications, offering to install
+# Rust first if it's missing. Any arguments go to the installer, for example:
+# ./install --dest ~/Desktop/test-install
 set -e
 
 # Double-clicking this in Finder starts it in the home folder.
 cd "$(dirname "$0")"
 
-if ! command -v cargo >/dev/null 2>&1; then
-    echo "Rust isn't installed. Install it from https://rustup.rs, then run ./install again." >&2
-    exit 1
+# Where rustup puts cargo. A terminal opened before Rust was installed doesn't
+# have it on its PATH yet.
+PATH="$PATH:${CARGO_HOME:-$HOME/.cargo}/bin"
+
+# Whether cargo runs, not just whether it's there: rustup puts its cargo in
+# place before it downloads Rust, so an interrupted install leaves one that
+# can't run anything.
+have_rust() {
+    cargo --version >/dev/null 2>&1
+}
+
+if ! have_rust; then
+    echo "Rust isn't installed, and Project Transfer needs it to build." >&2
+    printf "Install Rust now from https://rustup.rs? [Y/n] " >&2
+    # No answer at all, as when nobody is there to type one, counts as no.
+    # Nothing ended the question's line then, so end it here.
+    read -r answer || { echo >&2; answer=${answer:-n}; }
+    case "$answer" in
+    "" | [Yy]*) ;;
+    *)
+        echo "To install Rust yourself, run this command and then ./install again:" >&2
+        echo "    curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh" >&2
+        exit 1
+        ;;
+    esac
+    # -y skips rustup's own question, already answered above. sh counts the
+    # empty script from a failed download as a success, so check that cargo
+    # runs rather than trust the exit status.
+    curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y || true
+    if ! have_rust; then
+        echo "Rust didn't install. Run ./install to try again, or install Rust yourself from https://rustup.rs." >&2
+        exit 1
+    fi
 fi
 
 exec cargo xtask install "$@"

@@ -7,7 +7,7 @@ How to do local development: `DEVELOPMENT.md`.
 ## Constraints
 
 - Never shell out for file transfer, discovery or networking. `std::fs`, tokio and the listed crates only. The only processes the app starts are a project's commands and the installer's platform tools (`codesign`, `iconutil`, `ditto`, `lsregister`, PowerShell for the Windows shortcut).
-- No shell scripts in the repo, apart from the `install` and `install.ps1` wrappers and `.githooks/pre-commit`, which only run `cargo xtask`. Other tooling is Rust (`xtask`, run with `cargo xtask`).
+- No shell scripts in the repo, apart from the `install` and `install.ps1` wrappers, which only offer to install Rust when it's missing and run `cargo xtask`, and `.githooks/pre-commit`, which only runs `cargo xtask`. Other tooling is Rust (`xtask`, run with `cargo xtask`).
 - Every commit counts the patch version up and refreshes `words.txt` and `phrases.txt`: `.githooks/pre-commit` runs `cargo xtask pre-commit`. Turn it on once per clone with `cargo xtask hooks`. The app shows the version next to the settings cog.
 - `words.txt` lists every word in the tracked text files, and `word-changes.txt` the words the latest word-changing commit added (`+`) or removed (`-`). `phrases.txt` and `phrase-changes.txt` do the same for words that mix cases, such as `ActivityKind` or `macOS` (not `TLS`), and for IP addresses such as `10.0.0.5` or `fe80::1`; `words.txt` lists the parts of mixed-case words, except for keys and other random-looking ones. All four are generated; never edit them by hand. Rules are in `xtask/src/words.rs`, `xtask/src/phrases.rs` and `xtask/src/addresses.rs`.
 - Only private addresses: 10/8, 172.16/12, 192.168/16, 169.254/16, 127/8, ::1, fc00::/7, fe80::/10.

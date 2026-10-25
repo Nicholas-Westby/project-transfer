@@ -129,6 +129,7 @@ a1
 a2
 aa
 aaa
+aarch64
 ab
 abandoned
 abc
@@ -266,6 +267,7 @@ append
 appender
 appl
 apple
+apple's
 application
 applications
 applied
@@ -277,6 +279,9 @@ appropriate
 apps
 april
 arc
+arch
+arch-pc-windows-msvc
+architecture
 archive
 are
 area
@@ -287,6 +292,7 @@ arg
 args
 arguments
 arising
+arm64
 around
 array
 arrive
@@ -368,6 +374,7 @@ bar
 bare
 bars
 base
+basic
 basil
 batch
 baz
@@ -433,6 +440,7 @@ book
 bookkeeping
 bool
 boot
+bor
 border
 borrow
 borrowed
@@ -526,6 +534,7 @@ captures
 capturing
 card
 cargo
+cargo-ran-with
 carries
 carrot
 carry
@@ -533,6 +542,7 @@ case
 case-insensitive
 cases
 cast
+cat
 cat-file
 catalog
 catch
@@ -784,6 +794,7 @@ covered
 covers
 cow
 coyote
+cp
 crash
 crate
 crate's
@@ -803,6 +814,7 @@ cst
 csv
 ctx
 cur
+curl
 current
 cursor
 custom
@@ -918,6 +930,7 @@ dials
 dict
 did
 didn't
+didnt
 died
 diff
 differ
@@ -986,6 +999,9 @@ doubled
 down
 downcast
 downgrade
+download
+downloaded
+downloads
 dozen
 draft
 draft-2
@@ -1095,6 +1111,7 @@ er
 err
 error
 errors
+esac
 esc
 escape
 escaped
@@ -1178,6 +1195,7 @@ failure
 failures
 faint
 fake
+fakes
 falcon
 fallbacks
 falls
@@ -1342,7 +1360,6 @@ generation
 generic
 gentle
 get
-get-command
 gethostname
 gets
 gigabytes
@@ -1598,6 +1615,7 @@ intersects
 into
 invalid
 invites
+invoke
 involved
 io
 ip
@@ -1625,6 +1643,7 @@ jet
 jetbrains-mono
 job
 join
+join-path
 joined
 joiners
 joining
@@ -1835,6 +1854,7 @@ makes
 malformed
 man
 manage
+manager
 manifest
 manifests
 many
@@ -1926,6 +1946,7 @@ mixed
 mixed-case
 mixes
 mixing
+mkdir
 mock
 mod
 modal
@@ -2056,6 +2077,7 @@ norsrc
 north
 not
 not-a-uuid
+notcontains
 note
 noted
 notes
@@ -2066,6 +2088,7 @@ noticed
 notices
 notified
 notify
+notmatch
 now
 nowhere
 npm
@@ -2098,6 +2121,7 @@ offer
 offered
 offering
 offers
+official
 offline
 offset
 ofl
@@ -2219,6 +2243,7 @@ parrot
 parse
 parser's
 parses
+parsing
 part
 part's
 partial
@@ -2387,6 +2412,7 @@ problem
 problems
 process
 processes
+processor
 production
 profile
 program
@@ -2408,6 +2434,7 @@ prop
 property
 proportional
 props
+proto
 protocol
 proud
 proved
@@ -2453,6 +2480,8 @@ quarter
 query
 queryable
 question
+question's
+questions
 queue's
 queues
 quick
@@ -2470,6 +2499,7 @@ radius
 radix
 raised
 ran
+ran-with
 rand
 random
 random-looking
@@ -2495,6 +2525,7 @@ reached
 reaches
 reaching
 read
+read-host
 read-only
 readable
 reader
@@ -2585,6 +2616,7 @@ remote
 removal
 removals
 remove
+remove-item
 removed
 removes
 removing
@@ -2734,9 +2766,13 @@ runs
 runtime
 runtime's
 rust
+rust-lang
 rustic
 rustls
 rustup
+rustup's
+rustup-init
+rustup-ran-with
 rw
 rx
 rx2
@@ -2753,6 +2789,7 @@ same
 same-named
 sample
 samples
+sandbox
 saturating
 save
 saved
@@ -2853,6 +2890,7 @@ serves
 service
 services
 session
+session's
 set
 sets
 setting
@@ -2948,6 +2986,7 @@ slices
 slip
 slot
 slow
+slows
 sm
 small
 smaller
@@ -3018,6 +3057,7 @@ stamped
 stand
 stand-alone
 stand-in
+stand-ins
 standing
 stands
 start
@@ -3178,6 +3218,7 @@ ten
 tenth
 tenths
 term
+terminal
 terminals
 terminate
 terminating
@@ -3185,6 +3226,7 @@ termination
 terms
 test
 test-install
+test-rust
 test-util
 tested
 tester
@@ -3205,6 +3247,7 @@ then
 there
 these
 they
+they're
 thief
 thing
 things
@@ -3245,6 +3288,7 @@ titled
 tls
 tls12
 tls13
+tlsv1
 tmp
 to
 todo
@@ -3412,6 +3456,7 @@ use
 used
 user
 user's
+userprofile
 users
 usersecrets
 uses
@@ -3468,6 +3513,7 @@ viewport
 virtual
 visible
 visits
+visual
 visuals
 vivid
 void
@@ -3621,6 +3667,7 @@ yield
 you
 your
 yourself
+yy
 z
 zebra
 zero

@@ -23,6 +23,14 @@ Both run `cargo xtask install`, which you can also run yourself. If Windows
 says running scripts is disabled, run
 `powershell -ExecutionPolicy Bypass -File .\install.ps1` instead.
 
+If Rust is missing, the helper offers to install it with
+[rustup](https://rustup.rs), the official installer, and then goes on to
+build the app. If you say no, it tells you how to install Rust yourself. On
+Windows, rustup asks its own questions as well, and offers to install the
+Visual Studio C++ build tools if they're missing. On a Mac, the build needs
+Apple's command line tools; if they're missing, the build stops and macOS
+offers to install them, after which you run `./install` again.
+
 The installer builds a release binary and installs it:
 
 | System  | What it does                                                                                                                                                                                                                            |

@@ -1,3 +1,11 @@
-+CountFiles
-+FileCounts
-+PermissionDenied
++cargoBin
++cargoHome
++Invoke-WebRequest
++OutFile
++ProgressPreference
++rustupInit
++SecurityProtocol
++SecurityProtocolType
++ServicePointManager
++sSf
++UseBasicParsing

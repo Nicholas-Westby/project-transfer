@@ -68,6 +68,8 @@ BufWriter
 BumpVersion
 CancellationToken
 CancelTransfer
+cargoBin
+cargoHome
 CaseCollision
 CentralPanel
 CertificateDer
@@ -189,6 +191,7 @@ InstanceSettings
 Inter-SemiBold
 IntoIterator
 InvalidInput
+Invoke-WebRequest
 iOS
 IpAddr
 IPv4
@@ -265,6 +268,7 @@ OpenLogFolder
 OpenOptions
 OpenOptionsExt
 OsString
+OutFile
 OutgoingPairView
 OutputLine
 OwnedReadHalf
@@ -303,6 +307,7 @@ PrivateKeyDer
 PrivatePkcs8KeyDer
 processInfo
 ProgressBar
+ProgressPreference
 ProjectId
 ProjectInfo
 ProjectsChanged
@@ -335,12 +340,15 @@ RichText
 RollingFileAppender
 RunCommand
 RunStatus
+rustupInit
 RwLock
 SameContent
 SCDynamicStoreCopyComputerName
 ScrollArea
 ScrollBar
 ScrollStyle
+SecurityProtocol
+SecurityProtocolType
 SeedableRng
 SelectPeer
 SendEverything
@@ -352,6 +360,7 @@ ServerName
 ServiceDaemon
 ServiceEvent
 ServiceInfo
+ServicePointManager
 ServiceRemoved
 ServiceResolved
 SessionState
@@ -373,6 +382,7 @@ SignatureScheme
 SilentlyContinue
 sk-proj-Xy7Qa9Lm
 SocketAddr
+sSf
 StartedBy
 StartOptions
 StateHandle
@@ -417,6 +427,7 @@ UnboundedReceiver
 UnboundedSender
 UnexpectedEof
 UnixTime
+UseBasicParsing
 UserDirs
 UserInitiatedAllowingIdleSystemSleep
 VecDeque
