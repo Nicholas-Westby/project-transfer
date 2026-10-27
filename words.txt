@@ -284,7 +284,6 @@ append
 appender
 appl
 apple
-apple's
 application
 applications
 applied
@@ -640,7 +639,6 @@ clever
 cli
 click
 clicked
-clicking
 clicks
 client
 clients
@@ -648,7 +646,6 @@ clipped
 clippy
 clock
 clock's
-clocks
 clone
 clone's
 cloned
@@ -1065,7 +1062,6 @@ each
 eager
 earlier
 early
-easiest
 easily
 easy
 echo
@@ -2152,7 +2148,6 @@ offer
 offered
 offering
 offers
-official
 offline
 offset
 ofl
@@ -3291,7 +3286,6 @@ then
 there
 these
 they
-they're
 thief
 thing
 things
@@ -3314,7 +3308,6 @@ tides
 tidy
 tie
 tied
-ties
 tiger
 tilde
 time
