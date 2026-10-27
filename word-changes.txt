@@ -1,7 +1,2 @@
--apple's
--clicking
--clocks
--easiest
--official
--they're
--ties
++meadow
++twin
