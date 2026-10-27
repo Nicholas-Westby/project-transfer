@@ -1,15 +1,1 @@
-+AddSharedCommand
--CommandEditor
-+CommandsWithShared
-+CopySharedCommand
-+DeleteSharedCommand
-+EditSharedCommand
-+EndEdit
-+LinkSharedCommand
-+RadioButton
-+SaveEdit
-+ShareCommand
-+SharedCommand
-+SharedCommandId
-+SharedEdit
-+UnlinkCommand
++PowerShell's

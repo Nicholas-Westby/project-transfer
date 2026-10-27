@@ -306,6 +306,7 @@ PNGs
 PointerMoved
 PointingHand
 PowerShell
+PowerShell's
 PreCommit
 PrepareSync
 PretendWinitDelegate

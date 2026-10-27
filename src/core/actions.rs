@@ -103,10 +103,11 @@ pub enum Action {
     EditSharedCommand(SharedCommandId, String, String),
     /// The commands linked to it keep their text and become separate.
     DeleteSharedCommand(SharedCommandId),
-    /// The last field is the hash of the command text the user confirmed, or
-    /// None when `commands::must_confirm` said no confirmation was needed.
-    /// The core refuses if the stored text no longer matches either way.
-    RunCommand(ProjectId, CommandId, Option<String>),
+    /// The hash of the command text the run sheet showed, or None when the
+    /// command ran without one; the core refuses if the stored text no
+    /// longer matches either way. Then the value typed for each input, by
+    /// variable, which the core checks against the stored text too.
+    RunCommand(ProjectId, CommandId, Option<String>, Vec<(String, String)>),
     StopCommand(CommandId),
 }
 
@@ -204,7 +205,9 @@ impl Core {
                 self.edit_shared_command(s, label, line).await
             }
             Action::DeleteSharedCommand(s) => self.delete_shared_command(s).await,
-            Action::RunCommand(p, c, confirmed) => self.run_command(p, c, confirmed).await,
+            Action::RunCommand(p, c, confirmed, values) => {
+                self.run_command(p, c, confirmed, values).await
+            }
             Action::StopCommand(c) => {
                 self.stop_command(c);
                 Ok(())

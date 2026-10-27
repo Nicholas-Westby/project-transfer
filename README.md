@@ -147,6 +147,18 @@ details but only run on the computer where you click them. A command that is
 new on this computer, or changed since it last ran here, shows you its text
 to check before it runs.
 
+A command can ask for a value each time it runs, such as release notes. Put
+a variable whose name starts with `INPUT_` where the value goes, for example
+`./release.sh --notes "$INPUT_RELEASE_NOTES"`; the editor lists what the
+command will ask for as you type. Clicking the command's button then shows a
+box for each value, named after its variable: `INPUT_RELEASE_NOTES` asks for
+**Release notes**. The value reaches the command as an environment variable,
+as you typed it apart from spaces and line breaks at the end, so quotes, `$`
+and new lines in it are passed along rather than read as part of the
+command. On Windows, `$INPUT_RELEASE_NOTES`
+and `$env:INPUT_RELEASE_NOTES` both work. What you type is not saved or
+logged, and the boxes start empty each time.
+
 To use a command in more than one project, tick **Share with other
 projects** when you add or edit it. **Add command** in any project then has
 a **Shared commands** tab, where you pick one and add it as:

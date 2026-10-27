@@ -92,6 +92,11 @@
 16g-edit-linked-command
 16h-new-command-share
 16i-add-from-shared-light
+16j-editor-inputs
+16k-run-asks-inputs
+16l-run-check-and-inputs
+16m-run-asks-inputs-light
+16n-run-changed-while-open
 16u32
 16x16
 17-confirm-send-everything
@@ -116,6 +121,7 @@
 23-folder-menu
 23b-change-folder-on-peer
 255-byte
+2nd
 2x
 37e
 4a
@@ -272,6 +278,7 @@ app-here
 app2
 appear
 appearance
+appearing
 appears
 append
 appender
@@ -371,6 +378,7 @@ background
 backslash
 backslashes
 backticked
+backticks
 backtraces
 bad
 badge
@@ -1115,6 +1123,7 @@ enumerate
 env
 env-filter
 environment
+envs
 eof
 epaint
 ephemeral
@@ -1604,6 +1613,9 @@ inline
 inner
 ino
 input
+input's
+inputs
+inputx
 insert
 inside
 inspect
@@ -1933,6 +1945,7 @@ microsoft
 mid
 mid-file
 mid-run
+mid-sentence
 middle
 mighty
 millis
@@ -2432,6 +2445,7 @@ problems
 process
 processes
 processor
+prod
 production
 profile
 program
@@ -2677,6 +2691,7 @@ requester
 requests
 required
 requirement
+requires
 requoted
 rerun-if-changed
 reruns
@@ -2943,6 +2958,7 @@ sheet
 sheet's
 sheets
 shell
+shell's
 ship
 shop
 short
@@ -3383,6 +3399,7 @@ trips
 true
 truncate
 trust
+trusted
 trusts
 try
 ttf
@@ -3423,6 +3440,7 @@ unclear
 unclosed
 under
 underneath
+underscores
 undo
 undoes
 unequally
@@ -3518,7 +3536,9 @@ value
 values
 var
 variable
+variables
 variant
+vars
 ve
 vec
 vec2

@@ -3,8 +3,7 @@
 
 use super::theme::{CONTROL_RADIUS, Palette};
 use super::widgets::{self, mono};
-use super::{App, Confirm, Sheet, add_command, command_editor};
-use crate::commands::must_confirm;
+use super::{App, Confirm, Sheet, add_command, command_editor, run_sheet};
 use crate::core::{Action, CommandRun, RunStatus, UiState};
 use crate::model::{Command, CommandId, Os, Project, ProjectId};
 use egui::{Align, Frame, Layout, Margin, RichText, ScrollArea, Sides, Ui};
@@ -97,19 +96,27 @@ impl App {
         }
     }
 
-    /// Runs at once, or asks first when the command is new here or changed.
+    /// Runs at once, or opens the run sheet when the command is new here or
+    /// changed, or asks for values.
     fn request_run(&mut self, project: ProjectId, c: &Command) {
-        if must_confirm(c) {
-            self.view.confirm = Some(Confirm::RunCommand(project, c.id));
+        if run_sheet::needed(c) {
+            self.view.sheet = Sheet::RunCommand(run_sheet::Draft::of(project, c));
         } else {
-            self.run_now(project, c.id, None);
+            self.run_now(project, c.id, None, Vec::new());
         }
     }
 
-    /// `confirmed` is the hash of the text the user confirmed, if they had to.
-    pub(super) fn run_now(&mut self, project: ProjectId, id: CommandId, confirmed: Option<String>) {
+    /// `shown` is the hash of the text the run sheet showed, if it opened;
+    /// `values` what was typed for each input, by variable.
+    pub(super) fn run_now(
+        &mut self,
+        project: ProjectId,
+        id: CommandId,
+        shown: Option<String>,
+        values: Vec<(String, String)>,
+    ) {
         self.view.hidden_output.remove(&id);
-        self.act(Action::RunCommand(project, id, confirmed));
+        self.act(Action::RunCommand(project, id, shown, values));
     }
 
     fn output_panel(&mut self, ui: &mut Ui, id: CommandId, run: &CommandRun) {

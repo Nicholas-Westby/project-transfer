@@ -2,12 +2,14 @@
 //! sheet shares: the label and command boxes, the share box, and the note
 //! on a shared command saying which projects an edit reaches.
 
+use super::preview_view::small_ticks;
 use super::theme::Palette;
 use super::widgets;
 use super::{App, Sheet, dialogs};
+use crate::command_inputs::{self, PREFIX};
 use crate::core::{Action, UiState};
 use crate::model::{Command, CommandId, ProjectId, SharedCommandId};
-use egui::{Response, RichText, TextEdit, Ui, WidgetInfo};
+use egui::{Label, Response, RichText, TextEdit, Ui, WidgetInfo};
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct Draft {
@@ -98,10 +100,33 @@ pub(super) fn command_fields(ui: &mut Ui, label: &mut String, line: &mut String)
          click it."
     };
     widgets::small_muted(ui, shell);
+    inputs_help(ui, line);
+}
+
+/// How to make the command ask for a value when it runs, and what it asks
+/// for as the text stands.
+fn inputs_help(ui: &mut Ui, line: &str) {
+    let muted = Palette::of(ui.ctx()).muted();
+    let help = format!(
+        "To ask for a value each time it runs, use a variable that starts with `{PREFIX}`, \
+         such as `\"${PREFIX}RELEASE_NOTES\"`."
+    );
+    ui.add(Label::new(small_ticks(&help, muted)).wrap());
+    let asked = command_inputs::inputs(line);
+    if asked.is_empty() {
+        return;
+    }
+    ui.add_space(4.0);
+    ui.horizontal_wrapped(|ui| {
+        widgets::small_muted(ui, "Asks when it runs");
+        for i in &asked {
+            widgets::badge(ui, &i.label);
+        }
+    });
 }
 
 /// Screen readers, and the tests, find a box by the caption over it.
-fn named(r: &Response, name: &str, text: &str) {
+pub(super) fn named(r: &Response, name: &str, text: &str) {
     r.widget_info(|| {
         let mut info = WidgetInfo::text_edit(true, text, text, "");
         info.label = Some(name.into());

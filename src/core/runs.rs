@@ -4,6 +4,7 @@
 use super::commands::live_command;
 use super::state::{CommandRun, OutputLine, RunStatus};
 use super::{Core, lock};
+use crate::command_inputs;
 use crate::commands::{self, CommandOutput};
 use crate::model::{CommandId, ProjectId};
 use crate::transfer::projects::update_projects;
@@ -15,6 +16,7 @@ impl Core {
         id: ProjectId,
         cmd: CommandId,
         confirmed: Option<String>,
+        values: Vec<(String, String)>,
     ) -> anyhow::Result<()> {
         if lock(&self.runs).contains_key(&cmd) {
             bail!("That command is already running. Stop it first to run it again.");
@@ -54,6 +56,16 @@ impl Core {
             ),
             _ => {}
         }
+        // Read from the stored text, so a value can't be skipped by a sheet
+        // drawn from an older one.
+        let env = match command_inputs::values_for(&command.line, &values) {
+            Ok(env) => env,
+            Err(missing) => bail!(
+                "`{}` did not run: it needs a value for {}. Run it again and fill it in.",
+                command.label,
+                missing.label
+            ),
+        };
         // In place before the first line of output can arrive.
         self.ui.update(|s| {
             s.command_runs.insert(
@@ -65,7 +77,7 @@ impl Core {
             );
         });
         let (tx, rx) = std::sync::mpsc::channel();
-        let running = match commands::run(&command.line, &cwd, tx) {
+        let running = match commands::run(&command.line, &cwd, &env, tx) {
             Ok(r) => r,
             Err(e) => {
                 let why = format!("Could not run `{}`: {e:#}", command.label);
@@ -95,8 +107,17 @@ impl Core {
             ));
         }
         self.sync_projects().await;
+        // Names only: the values can be anything, secrets included.
+        let asked: Vec<String> = command_inputs::inputs(&command.line)
+            .into_iter()
+            .map(|i| i.label)
+            .collect();
+        let with = match asked.is_empty() {
+            true => String::new(),
+            false => format!(" with what you entered for {}", asked.join(", ")),
+        };
         self.ui
-            .info(format!("Running `{}` in `{project}`.", command.label));
+            .info(format!("Running `{}` in `{project}`{with}.", command.label));
         let (ui, runs, label) = (self.ui.clone(), self.runs.clone(), command.label);
         std::thread::spawn(move || {
             for out in rx {

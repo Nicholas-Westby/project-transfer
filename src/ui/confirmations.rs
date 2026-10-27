@@ -1,14 +1,11 @@
 //! Confirmations for every risky action except a transfer, whose preview
-//! is its own confirmation. Each is worded from the current state and sent
-//! only on confirm.
+//! is its own confirmation, and a command's run, which the run sheet
+//! confirms. Each is worded from the current state and sent only on confirm.
 
-use super::commands_view::os_name;
-use super::theme::{CONTROL_RADIUS, Palette};
-use super::widgets::mono;
 use super::{App, dialogs};
 use crate::core::{Action, UiState};
-use crate::model::{CommandId, FolderId, InstanceId, Os, Permissions, ProjectId, SharedCommandId};
-use egui::{Frame, Margin, RichText, Ui};
+use crate::model::{CommandId, FolderId, InstanceId, Permissions, ProjectId, SharedCommandId};
+use egui::Ui;
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum Confirm {
@@ -17,7 +14,6 @@ pub enum Confirm {
     Unpair(InstanceId),
     DeleteCommand(ProjectId, CommandId),
     DeleteSharedCommand(SharedCommandId),
-    RunCommand(ProjectId, CommandId),
     /// The peer and what it may do once confirmed.
     Revoke(InstanceId, Permissions),
     SendEverything,
@@ -43,9 +39,6 @@ impl App {
         let Some(c) = self.view.confirm.clone() else {
             return;
         };
-        // The hash of the command text this frame shows, so running it means
-        // running exactly what was read.
-        let mut shown_hash = None;
         let answer = match &c {
             Confirm::DeleteProject(id) => {
                 let Some(p) = s.project(*id) else {
@@ -148,44 +141,6 @@ impl App {
                     true,
                 )
             }
-            Confirm::RunCommand(pid, cid) => {
-                let Some(cmd) = command(s, *pid, *cid).cloned() else {
-                    self.view.confirm = None;
-                    return;
-                };
-                shown_hash = Some(crate::commands::command_hash(&cmd));
-                let pal = Palette::of(ui.ctx());
-                dialogs::confirm_with(
-                    ui,
-                    "confirm",
-                    &format!("Run {}?", cmd.label),
-                    "This command is new on this computer or changed since it last ran here. \
-                     Check that you trust it before it runs:",
-                    &format!("Run {}", cmd.label),
-                    false,
-                    |ui| {
-                        ui.add_space(6.0);
-                        Frame::new()
-                            .fill(pal.ground)
-                            .corner_radius(CONTROL_RADIUS)
-                            .inner_margin(Margin::same(12))
-                            .show(ui, |ui| {
-                                ui.set_width(ui.available_width());
-                                ui.add(egui::Label::new(mono(&cmd.line).color(pal.ink)).wrap());
-                            });
-                        if cmd.created_on != Os::current() {
-                            ui.add_space(6.0);
-                            ui.label(RichText::new(format!(
-                                "This command was created on {}. Commands from {} rarely work on {}.",
-                                os_name(cmd.created_on),
-                                os_name(cmd.created_on),
-                                os_name(Os::current())
-                            ))
-                            .color(pal.changed));
-                        }
-                    },
-                )
-            }
             Confirm::Revoke(id, new) => {
                 let Some(p) = s.peer(*id) else {
                     self.view.confirm = None;
@@ -215,19 +170,18 @@ impl App {
             Some(false) => self.view.confirm = None,
             Some(true) => {
                 self.view.confirm = None;
-                self.confirmed(c, shown_hash);
+                self.confirmed(c);
             }
         }
     }
 
-    fn confirmed(&mut self, c: Confirm, shown_hash: Option<String>) {
+    fn confirmed(&mut self, c: Confirm) {
         match c {
             Confirm::DeleteProject(id) => self.act(Action::DeleteProject(id)),
             Confirm::RemoveFolder(p, f) => self.act(Action::RemoveFolder(p, f)),
             Confirm::Unpair(id) => self.act(Action::Unpair(id)),
             Confirm::DeleteCommand(p, c) => self.act(Action::DeleteCommand(p, c)),
             Confirm::DeleteSharedCommand(id) => self.act(Action::DeleteSharedCommand(id)),
-            Confirm::RunCommand(p, c) => self.run_now(p, c, shown_hash),
             Confirm::Revoke(id, allows) => self.act(Action::SetAllows(id, allows)),
             Confirm::SendEverything => self.view.send_everything = true,
         }

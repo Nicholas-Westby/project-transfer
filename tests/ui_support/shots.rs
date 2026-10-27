@@ -1,6 +1,7 @@
 //! Renders each screen and dialog to PNG files for a person to look at.
 
 mod commands;
+mod inputs;
 
 use super::{FakeBackend, SIZE, sample_preview, with_pair_prompt};
 use egui_kittest::Harness;
@@ -204,6 +205,7 @@ pub fn all(dir: &Path) {
         h.get_by_label("Add command").click_accesskit();
     });
     commands::all(dir);
+    inputs::all(dir);
     shot(
         dir,
         "17-confirm-send-everything",

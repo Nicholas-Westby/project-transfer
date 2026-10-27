@@ -4,6 +4,7 @@ use std::path::Path;
 mod found;
 mod general;
 mod ignore;
+mod inputs;
 mod last_started;
 mod listed;
 mod paired;

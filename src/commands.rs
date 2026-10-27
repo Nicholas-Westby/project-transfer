@@ -98,6 +98,23 @@ fn shell_command(line: &str) -> std::process::Command {
     c
 }
 
+/// PowerShell reads an environment variable as `$env:INPUT_X`; a plain
+/// variable of the same name lets `$INPUT_X` work there as it does in sh.
+fn powershell_line(line: &str, env: &[(String, String)]) -> String {
+    // Names become code here, so only plain ones; inputs never have others.
+    let plain = |v: &&String| v.chars().all(|c| c.is_ascii_alphanumeric() || c == '_');
+    let mut script: String = env
+        .iter()
+        .map(|(var, _)| var)
+        .filter(plain)
+        // Lines of their own, so the command's first line still starts one,
+        // as a `#Requires` must.
+        .map(|var| format!("${var} = $env:{var}\n"))
+        .collect();
+    script.push_str(line);
+    script
+}
+
 fn pump(
     r: impl Read + Send + 'static,
     stderr: bool,
@@ -126,16 +143,27 @@ fn pump(
 
 /// Errors (missing folder, shell cannot start) are only returned, never sent on
 /// `out`; `CommandOutput::Failed` is for failures after the command started.
-pub fn run(line: &str, cwd: &Path, out: Sender<CommandOutput>) -> anyhow::Result<Running> {
+/// `env` holds the values of the command's inputs.
+pub fn run(
+    line: &str,
+    cwd: &Path,
+    env: &[(String, String)],
+    out: Sender<CommandOutput>,
+) -> anyhow::Result<Running> {
     if !cwd.is_dir() {
         anyhow::bail!(
             "The primary folder {} does not exist on this computer.",
             cwd.display()
         );
     }
+    let script = match cfg!(windows) {
+        true => powershell_line(line, env),
+        false => line.to_string(),
+    };
     #[cfg(windows)]
     let job = job::Job::new().context("could not set up the command's job object")?;
-    let mut child = shell_command(line)
+    let mut child = shell_command(&script)
+        .envs(env.iter().map(|(var, value)| (var, value)))
         .current_dir(cwd)
         .stdin(Stdio::null())
         .stdout(Stdio::piped())
@@ -179,204 +207,5 @@ pub fn run(line: &str, cwd: &Path, out: Sender<CommandOutput>) -> anyhow::Result
 }
 
 #[cfg(test)]
-mod tests {
-    use super::*;
-    use crate::model::Os;
-    use std::sync::mpsc;
-    use std::time::{Duration, Instant};
-
-    fn cmd(line: &str, last: Option<String>) -> Command {
-        Command {
-            id: uuid::Uuid::new_v4(),
-            label: "x".into(),
-            line: line.into(),
-            created_on: Os::MacOs,
-            updated_at_ms: 0,
-            deleted: false,
-            last_run_hash: last,
-            linked_to: None,
-        }
-    }
-
-    fn collect(rx: &mpsc::Receiver<CommandOutput>, secs: u64) -> Vec<CommandOutput> {
-        let end = Instant::now() + Duration::from_secs(secs);
-        let mut all = vec![];
-        while let Some(left) = end.checked_duration_since(Instant::now()) {
-            match rx.recv_timeout(left) {
-                Ok(o) => {
-                    let last = matches!(o, CommandOutput::Exited(_) | CommandOutput::Failed(_));
-                    all.push(o);
-                    if last {
-                        break;
-                    }
-                }
-                Err(_) => break,
-            }
-        }
-        all
-    }
-
-    #[test]
-    fn hash_is_sha256_of_the_line() {
-        assert_eq!(
-            command_hash(&cmd("abc", None)),
-            "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad"
-        );
-    }
-
-    #[test]
-    fn confirmation_tracks_the_line() {
-        let c = cmd("make", None);
-        assert!(needs_confirmation(&c));
-        let ran = cmd("make", Some(command_hash(&c)));
-        assert!(!needs_confirmation(&ran));
-        let edited = Command {
-            line: "make all".into(),
-            ..ran
-        };
-        assert!(needs_confirmation(&edited));
-    }
-
-    #[cfg(unix)]
-    #[test]
-    fn streams_output_then_exit_code() {
-        let dir = tempfile::tempdir().unwrap();
-        let (tx, rx) = mpsc::channel();
-        run("echo hi; echo oops >&2", dir.path(), tx).unwrap();
-        let got = collect(&rx, 10);
-        assert!(got.contains(&CommandOutput::Line {
-            stderr: false,
-            text: "hi".into()
-        }));
-        assert!(got.contains(&CommandOutput::Line {
-            stderr: true,
-            text: "oops".into()
-        }));
-        assert_eq!(got.last(), Some(&CommandOutput::Exited(Some(0))));
-    }
-
-    #[cfg(unix)]
-    #[test]
-    fn reports_exit_code() {
-        let dir = tempfile::tempdir().unwrap();
-        let (tx, rx) = mpsc::channel();
-        run("exit 3", dir.path(), tx).unwrap();
-        assert_eq!(
-            collect(&rx, 10).last(),
-            Some(&CommandOutput::Exited(Some(3)))
-        );
-    }
-
-    #[cfg(unix)]
-    #[test]
-    fn runs_in_the_given_folder() {
-        let dir = tempfile::tempdir().unwrap();
-        let (tx, rx) = mpsc::channel();
-        run("pwd -P", dir.path(), tx).unwrap();
-        let want = dir.path().canonicalize().unwrap().display().to_string();
-        let got = collect(&rx, 10);
-        assert!(got.contains(&CommandOutput::Line {
-            stderr: false,
-            text: want
-        }));
-    }
-
-    #[cfg(unix)]
-    #[test]
-    fn stop_kills_children_too() {
-        let dir = tempfile::tempdir().unwrap();
-        let (tx, rx) = mpsc::channel();
-        let running = run("sleep 30; echo unreachable", dir.path(), tx).unwrap();
-        std::thread::sleep(Duration::from_millis(300));
-        let t = Instant::now();
-        running.stop();
-        let got = collect(&rx, 2);
-        assert!(
-            matches!(got.last(), Some(CommandOutput::Exited(_))),
-            "{got:?}"
-        );
-        assert!(t.elapsed() < Duration::from_secs(2));
-        assert!(!got.iter().any(|o| matches!(o, CommandOutput::Line { .. })));
-    }
-
-    #[cfg(unix)]
-    #[test]
-    fn invalid_utf8_does_not_end_the_stream() {
-        let dir = tempfile::tempdir().unwrap();
-        let (tx, rx) = mpsc::channel();
-        run("printf 'bad\\377\\r\\n'; echo after", dir.path(), tx).unwrap();
-        let got = collect(&rx, 10);
-        assert!(
-            got.contains(&CommandOutput::Line {
-                stderr: false,
-                text: "bad\u{fffd}".into()
-            }),
-            "{got:?}"
-        );
-        assert!(got.contains(&CommandOutput::Line {
-            stderr: false,
-            text: "after".into()
-        }));
-        assert_eq!(got.last(), Some(&CommandOutput::Exited(Some(0))));
-    }
-
-    #[cfg(unix)]
-    #[test]
-    fn stop_works_while_a_background_child_holds_the_pipes() {
-        let dir = tempfile::tempdir().unwrap();
-        let (tx, rx) = mpsc::channel();
-        let running = run("sleep 30 & echo started", dir.path(), tx).unwrap();
-        assert!(matches!(
-            rx.recv_timeout(Duration::from_secs(5)),
-            Ok(CommandOutput::Line { .. })
-        ));
-        std::thread::sleep(Duration::from_millis(300));
-        let t = Instant::now();
-        running.stop();
-        let got = collect(&rx, 2);
-        assert!(
-            matches!(got.last(), Some(CommandOutput::Exited(_))),
-            "{got:?}"
-        );
-        assert!(t.elapsed() < Duration::from_secs(2));
-    }
-
-    #[cfg(windows)]
-    #[test]
-    fn stop_ends_what_the_shell_started_on_windows() {
-        let dir = tempfile::tempdir().unwrap();
-        let (tx, rx) = mpsc::channel();
-        // ping is a child process holding the inherited stderr pipe, as a dev
-        // server would; killing only PowerShell would leave it running.
-        let line = "Write-Output started; ping -n 30 127.0.0.1 > $null";
-        let running = run(line, dir.path(), tx).unwrap();
-        assert!(matches!(
-            rx.recv_timeout(Duration::from_secs(20)),
-            Ok(CommandOutput::Line { .. })
-        ));
-        let t = Instant::now();
-        running.stop();
-        let got = collect(&rx, 5);
-        assert!(
-            matches!(got.last(), Some(CommandOutput::Exited(_))),
-            "{got:?}"
-        );
-        assert!(t.elapsed() < Duration::from_secs(5));
-    }
-
-    #[test]
-    fn missing_folder_fails_clearly() {
-        let dir = tempfile::tempdir().unwrap();
-        let gone = dir.path().join("gone");
-        let (tx, rx) = mpsc::channel();
-        let err = run("echo hi", &gone, tx).err().unwrap();
-        assert_eq!(
-            err.to_string(),
-            format!(
-                "The primary folder {} does not exist on this computer.",
-                gone.display()
-            )
-        );
-        assert!(rx.try_recv().is_err());
-    }
-}
+#[path = "commands_tests.rs"]
+mod tests;

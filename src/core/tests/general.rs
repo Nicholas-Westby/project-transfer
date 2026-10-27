@@ -12,7 +12,7 @@ fn running_a_command_uses_the_primary_folder_and_records_its_hash() {
     let c = f.project().commands[0].clone();
     assert!(crate::commands::needs_confirmation(&c));
     let hash = crate::commands::command_hash(&c);
-    f.act(Action::RunCommand(p.id, c.id, Some(hash)));
+    f.act(Action::RunCommand(p.id, c.id, Some(hash), vec![]));
     wait_until(&f.core, "the command to exit", |s| {
         s.command_runs
             .get(&c.id)
@@ -34,8 +34,8 @@ fn a_running_command_can_be_stopped() {
     f.act(Action::AddCommand(p.id, "Wait".into(), "sleep 30".into()));
     let c = f.project().commands[0].clone();
     let hash = Some(crate::commands::command_hash(&c));
-    f.act(Action::RunCommand(p.id, c.id, hash.clone()));
-    f.act(Action::RunCommand(p.id, c.id, hash));
+    f.act(Action::RunCommand(p.id, c.id, hash.clone(), vec![]));
+    f.act(Action::RunCommand(p.id, c.id, hash, vec![]));
     assert!(f.last_activity().text.contains("already running"));
     f.act(Action::StopCommand(c.id));
     wait_until(&f.core, "the command to stop", |s| {
@@ -50,7 +50,7 @@ fn a_command_runs_only_as_confirmed() {
     f.act(Action::AddCommand(p.id, "Build".into(), "make".into()));
     let c = f.project().commands[0].clone();
     // New here, so running without a confirmation is refused.
-    f.act(Action::RunCommand(p.id, c.id, None));
+    f.act(Action::RunCommand(p.id, c.id, None, vec![]));
     assert!(f.last_activity().text.contains("did not run"));
     // Confirmed text that has since been replaced is refused too.
     let old = crate::commands::command_hash(&c);
@@ -60,7 +60,7 @@ fn a_command_runs_only_as_confirmed() {
         "Build".into(),
         "make all".into(),
     ));
-    f.act(Action::RunCommand(p.id, c.id, Some(old)));
+    f.act(Action::RunCommand(p.id, c.id, Some(old), vec![]));
     let line = f.last_activity();
     assert_eq!(line.kind, ActivityKind::Error);
     assert!(

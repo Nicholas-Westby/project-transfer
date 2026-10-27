@@ -258,12 +258,21 @@ fn path_line(text: &str, marker: Color32, ink: Color32) -> LayoutJob {
 
 /// Body text with `backticked` names set in mono, as the core writes them.
 pub fn ticks(text: &str, color: Color32) -> LayoutJob {
+    sized_ticks(text, color, 14.0)
+}
+
+/// `ticks` for small print.
+pub fn small_ticks(text: &str, color: Color32) -> LayoutJob {
+    sized_ticks(text, color, 12.0)
+}
+
+fn sized_ticks(text: &str, color: Color32, size: f32) -> LayoutJob {
     let mut job = LayoutJob::default();
     for (i, part) in text.split('`').enumerate() {
         let font = if i % 2 == 1 {
-            FontId::monospace(13.0)
+            FontId::monospace(size - 1.0)
         } else {
-            FontId::proportional(14.0)
+            FontId::proportional(size)
         };
         let mut f = TextFormat::simple(font, color);
         f.valign = egui::Align::Center;

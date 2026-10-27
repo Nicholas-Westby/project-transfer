@@ -1,6 +1,7 @@
 //! Project Transfer: mirrors project folders between computers on a LAN.
 //! Modules are added by later tasks.
 pub mod address;
+pub mod command_inputs;
 pub mod commands;
 pub mod core;
 pub mod discovery;

@@ -144,7 +144,7 @@ fn a_received_command_shows_its_text_before_it_runs() {
     fake.update(|s| shown = Some(s.projects[0].commands[1].clone()));
     let shown = shown.unwrap();
     let want = project_transfer::commands::command_hash(&shown);
-    assert!(matches!(&fake.actions()[..], [Action::RunCommand(_, _, Some(h))] if *h == want));
+    assert!(matches!(&fake.actions()[..], [Action::RunCommand(_, _, Some(h), _)] if *h == want));
 }
 
 /// Writes PNGs of each screen for review when `UI_SHOTS_DIR` is set.

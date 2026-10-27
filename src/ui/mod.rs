@@ -27,6 +27,7 @@ mod preview_view;
 mod project_view;
 mod projects_list;
 pub mod remote_projects;
+pub mod run_sheet;
 mod session_bar;
 mod settings;
 pub mod theme;
@@ -83,6 +84,7 @@ pub enum Sheet {
     Settings(settings::Draft),
     AddCommand(add_command::Draft),
     EditCommand(command_editor::Draft),
+    RunCommand(run_sheet::Draft),
     PeerFolder(peer_folder::PeerFolderDraft),
 }
 
@@ -232,6 +234,7 @@ impl App {
             Sheet::Settings(draft) => self.settings_sheet(ui, s, draft),
             Sheet::AddCommand(draft) => self.add_command_sheet(ui, s, draft),
             Sheet::EditCommand(draft) => self.edit_command_sheet(ui, s, draft),
+            Sheet::RunCommand(draft) => self.run_command_sheet(ui, s, draft),
             Sheet::PeerFolder(draft) => self.peer_folder_sheet(ui, s, draft),
         }
     }
