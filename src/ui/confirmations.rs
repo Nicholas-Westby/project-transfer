@@ -7,7 +7,7 @@ use super::theme::{CONTROL_RADIUS, Palette};
 use super::widgets::mono;
 use super::{App, dialogs};
 use crate::core::{Action, UiState};
-use crate::model::{CommandId, FolderId, InstanceId, Os, Permissions, ProjectId};
+use crate::model::{CommandId, FolderId, InstanceId, Os, Permissions, ProjectId, SharedCommandId};
 use egui::{Frame, Margin, RichText, Ui};
 
 #[derive(Clone, Debug, PartialEq)]
@@ -16,6 +16,7 @@ pub enum Confirm {
     RemoveFolder(ProjectId, FolderId),
     Unpair(InstanceId),
     DeleteCommand(ProjectId, CommandId),
+    DeleteSharedCommand(SharedCommandId),
     RunCommand(ProjectId, CommandId),
     /// The peer and what it may do once confirmed.
     Revoke(InstanceId, Permissions),
@@ -97,16 +98,53 @@ impl App {
                 )
             }
             Confirm::DeleteCommand(pid, cid) => {
-                let Some(label) = command(s, *pid, *cid).map(|c| c.label.clone()) else {
+                let Some(c) = command(s, *pid, *cid) else {
                     self.view.confirm = None;
                     return;
+                };
+                let stays = match c.linked_to {
+                    Some(_) => " The shared command stays, so you can add it again.",
+                    None => "",
                 };
                 dialogs::confirm(
                     ui,
                     "confirm",
-                    &format!("Delete {label}?"),
-                    "The deletion reaches other computers on the next transfer.",
+                    &format!("Delete {}?", c.label),
+                    &format!("The deletion reaches other computers on the next transfer.{stays}"),
                     "Delete command",
+                    true,
+                )
+            }
+            Confirm::DeleteSharedCommand(id) => {
+                let Some(c) = s.shared_commands.iter().find(|c| c.id == *id && !c.deleted) else {
+                    self.view.confirm = None;
+                    return;
+                };
+                let linked = s
+                    .projects
+                    .iter()
+                    .flat_map(|p| &p.commands)
+                    .filter(|c| !c.deleted && c.linked_to == Some(*id))
+                    .count();
+                let kept = match linked {
+                    0 => String::new(),
+                    1 => "The command linked to it keeps its text and becomes a separate \
+                          command. "
+                        .into(),
+                    n => format!(
+                        "The {n} commands linked to it keep their text and become separate \
+                         commands. "
+                    ),
+                };
+                dialogs::confirm(
+                    ui,
+                    "confirm",
+                    &format!("Delete shared command {}?", c.label),
+                    &format!(
+                        "{kept}Paired computers drop it from their shared commands after the \
+                         next transfer."
+                    ),
+                    "Delete shared command",
                     true,
                 )
             }
@@ -188,6 +226,7 @@ impl App {
             Confirm::RemoveFolder(p, f) => self.act(Action::RemoveFolder(p, f)),
             Confirm::Unpair(id) => self.act(Action::Unpair(id)),
             Confirm::DeleteCommand(p, c) => self.act(Action::DeleteCommand(p, c)),
+            Confirm::DeleteSharedCommand(id) => self.act(Action::DeleteSharedCommand(id)),
             Confirm::RunCommand(p, c) => self.run_now(p, c, shown_hash),
             Confirm::Revoke(id, allows) => self.act(Action::SetAllows(id, allows)),
             Confirm::SendEverything => self.view.send_everything = true,

@@ -1,11 +1,9 @@
 //! Project bookkeeping both sides of a transfer share: where a folder lands,
-//! taking in a project from the other computer, commands and records.
+//! taking in a project from the other computer, and records.
 
+use super::commands::wire_commands;
 use super::validate_name;
-use crate::merge::merge_commands;
-use crate::model::{
-    Command, Direction, Folder, FolderId, InstanceId, Project, ProjectId, TransferRecord,
-};
+use crate::model::{Direction, Folder, FolderId, InstanceId, Project, ProjectId, TransferRecord};
 use crate::net::Shared;
 use anyhow::anyhow;
 use std::collections::{HashMap, HashSet};
@@ -213,17 +211,6 @@ pub async fn update_projects<T>(
     Ok(out)
 }
 
-/// The run hash is this computer's own record, so it never leaves it.
-pub fn wire_commands(commands: &[Command]) -> Vec<Command> {
-    commands
-        .iter()
-        .map(|c| Command {
-            last_run_hash: None,
-            ..c.clone()
-        })
-        .collect()
-}
-
 /// The project as sent to the other computer: no paths, no run hashes.
 pub fn wire_project(p: &Project) -> Project {
     Project {
@@ -238,25 +225,6 @@ pub fn wire_project(p: &Project) -> Project {
         commands: wire_commands(&p.commands),
         ..p.clone()
     }
-}
-
-/// Merges `remote` into the project if this computer has it, and returns the
-/// list to send back.
-pub async fn exchange_commands(
-    shared: &Shared,
-    project: ProjectId,
-    remote: &[Command],
-) -> anyhow::Result<Vec<Command>> {
-    update_projects(shared, |all| {
-        Ok(match all.iter_mut().find(|p| p.id == project) {
-            Some(p) => {
-                p.commands = merge_commands(&p.commands, remote);
-                wire_commands(&p.commands)
-            }
-            None => wire_commands(remote),
-        })
-    })
-    .await
 }
 
 /// Which computer started a transfer, so each side describes it from where

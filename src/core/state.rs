@@ -2,7 +2,7 @@
 
 use crate::discovery::Discovered;
 use crate::model::{
-    CommandId, InstanceId, InstanceSettings, Peer, Permissions, Project, ProjectId,
+    CommandId, InstanceId, InstanceSettings, Peer, Permissions, Project, ProjectId, SharedCommand,
 };
 use crate::protocol::RemoteProject;
 use crate::transfer::{Preview, Summary};
@@ -25,6 +25,9 @@ pub struct UiState {
     pub peers: Vec<PeerView>,
     pub discovered: Vec<Discovered>,
     pub projects: Vec<Project>,
+    /// Deleted ones too, marked, as they are kept until every computer
+    /// has heard.
+    pub shared_commands: Vec<SharedCommand>,
     pub selected_peer: Option<InstanceId>,
     pub activity: Vec<ActivityLine>,
     /// Another computer asks to pair; answer with `Action::AnswerPair`.
@@ -49,6 +52,7 @@ impl UiState {
             peers: Vec::new(),
             discovered: Vec::new(),
             projects: Vec::new(),
+            shared_commands: Vec::new(),
             selected_peer: None,
             activity: Vec::new(),
             pair_prompt: None,

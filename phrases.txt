@@ -36,6 +36,7 @@ AddFolder
 AddIgnore
 addItem
 addMethod
+AddSharedCommand
 AnswerPair
 AnyCert
 AnyClass
@@ -97,15 +98,16 @@ CloseHandle
 CollapsingHeader
 Color32Image
 ComboBox
-CommandEditor
 CommandExt
 CommandId
 CommandOutput
 CommandRun
+CommandsWithShared
 CommonName
 ComObject
 ConfirmPairCode
 CoolThings
+CopySharedCommand
 CoreServices
 CornerRadius
 CountFiles
@@ -118,6 +120,7 @@ CursorIcon
 DefaultGuard
 DeleteCommand
 DeleteProject
+DeleteSharedCommand
 DeserializeOwned
 DiffTag
 DigitallySignedStruct
@@ -131,7 +134,9 @@ DockItem
 DTDs
 DuplexStream
 EditCommand
+EditSharedCommand
 endActivity
+EndEdit
 EndPull
 EndPush
 EnvFilter
@@ -215,6 +220,7 @@ LastStarted
 LaunchServices
 LayoutJob
 LeftOut
+LinkSharedCommand
 LiteralPath
 LSMinimumSystemVersion
 MacBook
@@ -320,6 +326,7 @@ PSScriptRoot
 PullOrPush
 PushState
 PutFile
+RadioButton
 RawInput
 ReadFile
 ReadSomethingNew
@@ -343,6 +350,7 @@ RunStatus
 rustupInit
 RwLock
 SameContent
+SaveEdit
 SCDynamicStoreCopyComputerName
 ScrollArea
 ScrollBar
@@ -376,7 +384,11 @@ SetProjectsFolder
 setTag
 setTarget
 SetTheme
+ShareCommand
 sharedApplication
+SharedCommand
+SharedCommandId
+SharedEdit
 SheetResponse
 SignatureScheme
 SilentlyContinue
@@ -427,6 +439,7 @@ UnboundedReceiver
 UnboundedSender
 UnexpectedEof
 UnixTime
+UnlinkCommand
 UseBasicParsing
 UserDirs
 UserInitiatedAllowingIdleSystemSleep

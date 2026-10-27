@@ -1,7 +1,9 @@
 //! Encrypted connections between instances, pairing, and the permission gate.
 
 use crate::identity::Identity;
-use crate::model::{InstanceId, InstanceSettings, Peer, Permissions, Project, ProjectId};
+use crate::model::{
+    InstanceId, InstanceSettings, Peer, Permissions, Project, ProjectId, SharedCommand,
+};
 use crate::store::Store;
 use std::collections::HashMap;
 use std::net::SocketAddr;
@@ -40,6 +42,9 @@ pub struct Shared {
     pub settings: Arc<RwLock<InstanceSettings>>,
     pub peers: Arc<RwLock<Vec<Peer>>>,
     pub projects: Arc<RwLock<Vec<Project>>>,
+    /// Locked after `projects` whenever both are, so two edits never wait
+    /// on each other.
+    pub shared_commands: Arc<RwLock<Vec<SharedCommand>>>,
     pub store: Arc<Store>,
     pub identity: Arc<Identity>,
     pub events: tokio::sync::mpsc::UnboundedSender<NetEvent>,

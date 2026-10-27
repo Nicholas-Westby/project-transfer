@@ -4,6 +4,7 @@
 use project_transfer::identity::Identity;
 use project_transfer::model::{
     Command, Direction, Folder, InstanceSettings, Os, Permissions, Project, ProjectId,
+    SharedCommand,
 };
 use project_transfer::net::{Connection, NetEvent, Shared, pair_finish, pair_start, serve};
 use project_transfer::store::Store;
@@ -56,6 +57,7 @@ impl Instance {
             settings: Arc::new(RwLock::new(settings)),
             peers: Arc::new(RwLock::new(Vec::new())),
             projects: Arc::new(RwLock::new(Vec::new())),
+            shared_commands: Default::default(),
             store: Arc::new(store),
             identity: Arc::new(identity),
             events: tx,
@@ -154,6 +156,17 @@ impl Instance {
         all.retain(|x| x.id != p.id);
         all.push(p);
         self.shared.store.save_projects(&all).unwrap();
+    }
+
+    /// Replaces the shared commands, in memory and on disk.
+    pub async fn put_shared_commands(&self, list: Vec<SharedCommand>) {
+        let mut all = self.shared.shared_commands.write().await;
+        self.shared.store.save_shared_commands(&list).unwrap();
+        *all = list;
+    }
+
+    pub async fn shared_commands(&self) -> Vec<SharedCommand> {
+        self.shared.shared_commands.read().await.clone()
     }
 
     pub async fn project(&self, id: ProjectId) -> Option<Project> {
@@ -350,5 +363,6 @@ pub fn command(label: &str, at: i64, hash: Option<&str>) -> Command {
         updated_at_ms: at,
         deleted: false,
         last_run_hash: hash.map(str::to_string),
+        linked_to: None,
     }
 }

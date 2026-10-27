@@ -2,7 +2,9 @@
 
 use super::Core;
 use crate::discovery::Discovered;
-use crate::model::{CommandId, FolderId, InstanceId, Permissions, ProjectId, ThemeChoice};
+use crate::model::{
+    CommandId, FolderId, InstanceId, Permissions, ProjectId, SharedCommandId, ThemeChoice,
+};
 use crate::transfer::TransferRequest;
 use crate::viewer::FileAsk;
 use std::path::PathBuf;
@@ -83,8 +85,24 @@ pub enum Action {
 
     /// Project, label, command line.
     AddCommand(ProjectId, String, String),
+    /// Like `AddCommand`, and adds it to the shared commands, linked.
+    AddSharedCommand(ProjectId, String, String),
+    /// Edits a linked command's shared command, and so every command
+    /// linked to it.
     EditCommand(ProjectId, CommandId, String, String),
     DeleteCommand(ProjectId, CommandId),
+    /// Adds the command to the shared commands and links it.
+    ShareCommand(ProjectId, CommandId),
+    /// Stops the command following its shared command; it keeps its text.
+    UnlinkCommand(ProjectId, CommandId),
+    /// Adds the shared command to the project, linked.
+    LinkSharedCommand(ProjectId, SharedCommandId),
+    /// Adds a separate copy of the shared command to the project.
+    CopySharedCommand(ProjectId, SharedCommandId),
+    /// Shared command, label, command line.
+    EditSharedCommand(SharedCommandId, String, String),
+    /// The commands linked to it keep their text and become separate.
+    DeleteSharedCommand(SharedCommandId),
     /// The last field is the hash of the command text the user confirmed, or
     /// None when `commands::must_confirm` said no confirmation was needed.
     /// The core refuses if the stored text no longer matches either way.
@@ -173,8 +191,19 @@ impl Core {
             }
 
             Action::AddCommand(p, label, line) => self.add_command(p, label, line).await,
+            Action::AddSharedCommand(p, label, line) => {
+                self.add_shared_command(p, label, line).await
+            }
             Action::EditCommand(p, c, label, line) => self.edit_command(p, c, label, line).await,
             Action::DeleteCommand(p, c) => self.delete_command(p, c).await,
+            Action::ShareCommand(p, c) => self.share_command(p, c).await,
+            Action::UnlinkCommand(p, c) => self.unlink_command(p, c).await,
+            Action::LinkSharedCommand(p, s) => self.link_shared_command(p, s).await,
+            Action::CopySharedCommand(p, s) => self.copy_shared_command(p, s).await,
+            Action::EditSharedCommand(s, label, line) => {
+                self.edit_shared_command(s, label, line).await
+            }
+            Action::DeleteSharedCommand(s) => self.delete_shared_command(s).await,
             Action::RunCommand(p, c, confirmed) => self.run_command(p, c, confirmed).await,
             Action::StopCommand(c) => {
                 self.stop_command(c);

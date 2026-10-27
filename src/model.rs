@@ -8,6 +8,7 @@ pub type InstanceId = uuid::Uuid;
 pub type ProjectId = uuid::Uuid;
 pub type FolderId = uuid::Uuid;
 pub type CommandId = uuid::Uuid;
+pub type SharedCommandId = uuid::Uuid;
 
 #[derive(Clone, Copy, Debug, Default, Serialize, Deserialize, PartialEq, Eq)]
 pub enum ThemeChoice {
@@ -121,6 +122,24 @@ pub struct Command {
     /// Local only: the network layer strips this before sending a command.
     #[serde(default)]
     pub last_run_hash: Option<String>,
+    /// The shared command this one follows. A linked command always carries
+    /// that command's text too, so it still runs where the shared one is
+    /// unknown, such as on an older version.
+    #[serde(default)]
+    pub linked_to: Option<SharedCommandId>,
+}
+
+/// A command any project can add, linked so it follows every edit, or as a
+/// separate copy. Paired computers swap these with every command exchange.
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
+pub struct SharedCommand {
+    pub id: SharedCommandId,
+    pub label: String,
+    pub line: String,
+    pub created_on: Os,
+    pub updated_at_ms: i64,
+    /// Kept as a marker so the deletion reaches other computers.
+    pub deleted: bool,
 }
 
 #[derive(Clone, Copy, Debug, Serialize, Deserialize, PartialEq, Eq)]

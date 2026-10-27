@@ -13,7 +13,7 @@ How to do local development: `DEVELOPMENT.md`.
 - Only private addresses: 10/8, 172.16/12, 192.168/16, 169.254/16, 127/8, ::1, fc00::/7, fe80::/10.
 - mDNS service type: `_projtransfer._tcp.local.`
 - Data home: `Project Transfer` in the per-user local app data folder (`store::default_root`), overridden by env `PROJECT_TRANSFER_HOME`.
-- Files in the data home: `instance.json`, `peers.json`, `projects.json`, `identity/cert.der`, `identity/key.der`, `logs/`. All JSON writes are temp-file-then-rename.
+- Files in the data home: `instance.json`, `peers.json`, `projects.json`, `shared-commands.json`, `identity/cert.der`, `identity/key.der`, `logs/`. All JSON writes are temp-file-then-rename.
 - When a change alters what the main window looks like, run `cargo xtask screenshot` and commit the updated `assets/images/project-transfer.webp`. It renders mock data only.
 - Default theme is dark. Palette and type are set in `src/ui/theme.rs`.
 - UI copy: sentence case, buttons name their action, errors say what happened and what to do. No ALL CAPS labels.

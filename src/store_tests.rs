@@ -42,6 +42,7 @@ fn sample_project() -> Project {
             updated_at_ms: 5,
             deleted: false,
             last_run_hash: Some("abc".into()),
+            linked_to: Some(Uuid::new_v4()),
         }],
         last_transfer: Some(TransferRecord {
             at_ms: 9,
@@ -177,6 +178,36 @@ fn projects_round_trip_and_missing_is_empty() {
     let p = sample_project();
     s.save_projects(std::slice::from_ref(&p)).unwrap();
     assert_eq!(s.load_projects().unwrap(), vec![p]);
+}
+
+#[test]
+fn a_command_saved_before_shared_commands_loads_unlinked() {
+    let (_d, s) = store();
+    let old = r#"[{"id":"7d8b6c1e-2f4a-4b5c-9d6e-0f1a2b3c4d5e","name":"App",
+        "folders":[],"primary":"7d8b6c1e-2f4a-4b5c-9d6e-0f1a2b3c4d5f",
+        "commands":[{"id":"7d8b6c1e-2f4a-4b5c-9d6e-0f1a2b3c4d60","label":"Build",
+        "line":"make","created_on":"MacOs","updated_at_ms":5,"deleted":false}],
+        "last_transfer":null}]"#;
+    std::fs::write(s.root().join("projects.json"), old).unwrap();
+    let projects = s.load_projects().unwrap();
+    assert_eq!(projects[0].commands[0].linked_to, None);
+}
+
+#[test]
+fn shared_commands_round_trip_and_missing_is_empty() {
+    let (_d, s) = store();
+    assert!(s.load_shared_commands().unwrap().is_empty());
+    let c = SharedCommand {
+        id: Uuid::new_v4(),
+        label: "Release".into(),
+        line: "./release.sh".into(),
+        created_on: Os::MacOs,
+        updated_at_ms: 3,
+        deleted: false,
+    };
+    s.save_shared_commands(std::slice::from_ref(&c)).unwrap();
+    assert_eq!(s.load_shared_commands().unwrap(), vec![c]);
+    assert!(s.root().join("shared-commands.json").is_file());
 }
 
 #[test]

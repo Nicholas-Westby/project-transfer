@@ -1,6 +1,6 @@
 //! Reads and writes the files in the data home.
 
-use crate::model::{InstanceSettings, Peer, Project, ThemeChoice};
+use crate::model::{InstanceSettings, Peer, Project, SharedCommand, ThemeChoice};
 use anyhow::Context;
 use serde::{Serialize, de::DeserializeOwned};
 use std::io::Write;
@@ -81,6 +81,14 @@ impl Store {
 
     pub fn save_projects(&self, p: &[Project]) -> anyhow::Result<()> {
         self.write_json("projects.json", p)
+    }
+
+    pub fn load_shared_commands(&self) -> anyhow::Result<Vec<SharedCommand>> {
+        Ok(self.read_json("shared-commands.json")?.unwrap_or_default())
+    }
+
+    pub fn save_shared_commands(&self, c: &[SharedCommand]) -> anyhow::Result<()> {
+        self.write_json("shared-commands.json", c)
     }
 
     pub fn identity_dir(&self) -> PathBuf {

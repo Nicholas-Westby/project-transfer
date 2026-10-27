@@ -1,13 +1,13 @@
-//! Editing projects, their folders and their commands. Every edit keeps the
-//! primary folder a member of the project and never touches files on disk.
+//! Editing projects and their folders. Every edit keeps the primary folder a
+//! member of the project and never touches files on disk.
 
 use super::Core;
-use crate::model::{Command, CommandId, Description, Folder, FolderId, Os, Project, ProjectId};
+use crate::model::{Description, Folder, FolderId, Project, ProjectId};
 use crate::transfer::home;
 use crate::transfer::projects::{now_ms, update_projects};
 use std::path::{Path, PathBuf};
 
-type Edit<T> = Result<T, String>;
+pub(super) type Edit<T> = Result<T, String>;
 
 impl Core {
     /// Applies `f`, saves, refreshes the UI and records `f`'s sentence.
@@ -18,9 +18,14 @@ impl Core {
         Ok(())
     }
 
+    /// Shows the projects and the shared commands as they are now.
     pub(super) async fn sync_projects(&self) {
         let projects = self.shared.projects.read().await.clone();
-        self.ui.update(|s| s.projects = projects);
+        let library = self.shared.shared_commands.read().await.clone();
+        self.ui.update(|s| {
+            s.projects = projects;
+            s.shared_commands = library;
+        });
     }
 
     pub(super) async fn create_project(&self, name: String, folder: PathBuf) -> anyhow::Result<()> {
@@ -179,80 +184,18 @@ impl Core {
         })
         .await
     }
-
-    pub(super) async fn add_command(
-        &self,
-        id: ProjectId,
-        label: String,
-        line: String,
-    ) -> anyhow::Result<()> {
-        self.edit(|all| {
-            let (label, line) = command_text(&label, &line)?;
-            let p = project(all, id)?;
-            p.commands.push(Command {
-                id: CommandId::new_v4(),
-                label: label.clone(),
-                line,
-                created_on: Os::current(),
-                updated_at_ms: now_ms(),
-                deleted: false,
-                last_run_hash: None,
-            });
-            Ok(format!("Added command `{label}` to `{}`.", p.name))
-        })
-        .await
-    }
-
-    pub(super) async fn edit_command(
-        &self,
-        id: ProjectId,
-        cmd: CommandId,
-        label: String,
-        line: String,
-    ) -> anyhow::Result<()> {
-        self.edit(|all| {
-            let (label, line) = command_text(&label, &line)?;
-            let c = live_command(project(all, id)?, cmd)?;
-            c.label = label.clone();
-            c.line = line;
-            c.updated_at_ms = now_ms();
-            Ok(format!("Saved command `{label}`."))
-        })
-        .await
-    }
-
-    pub(super) async fn delete_command(&self, id: ProjectId, cmd: CommandId) -> anyhow::Result<()> {
-        self.edit(|all| {
-            let c = live_command(project(all, id)?, cmd)?;
-            c.deleted = true;
-            c.updated_at_ms = now_ms();
-            Ok(format!(
-                "Deleted command `{}`. Paired computers drop it after the next transfer.",
-                c.label
-            ))
-        })
-        .await
-    }
 }
 
 const GONE_PROJECT: &str = "That project is no longer on this computer.";
 const GONE_FOLDER: &str = "That folder is no longer part of the project.";
-const GONE_COMMAND: &str = "That command no longer exists.";
 
-fn project(all: &mut [Project], id: ProjectId) -> Edit<&mut Project> {
+pub(super) fn project(all: &mut [Project], id: ProjectId) -> Edit<&mut Project> {
     all.iter_mut()
         .find(|p| p.id == id)
         .ok_or_else(|| GONE_PROJECT.to_string())
 }
 
-pub(super) fn live_command(p: &mut Project, id: CommandId) -> Edit<&mut Command> {
-    p.commands
-        .iter_mut()
-        .find(|c| c.id == id && !c.deleted)
-        .ok_or_else(|| GONE_COMMAND.to_string())
-}
-
-fn required(text: &str, why: &str) -> Edit<String> {
+pub(super) fn required(text: &str, why: &str) -> Edit<String> {
     let t = text.trim();
     if t.is_empty() {
         return Err(why.to_string());
@@ -274,12 +217,6 @@ fn usable_folder_name(path: &Path) -> Edit<String> {
         )),
         None => Ok(name),
     }
-}
-
-fn command_text(label: &str, line: &str) -> Edit<(String, String)> {
-    let label = required(label, "Enter a label for the command.")?;
-    let line = required(line, "Enter the command to run.")?;
-    Ok((label, line))
 }
 
 fn folder_name(path: &Path) -> String {

@@ -7,9 +7,10 @@ use crate::ignore_rules::Matcher;
 use crate::manifest::compose_for;
 use crate::model::{FolderId, Os, Peer, ProjectId};
 use crate::protocol::{FolderScan, Request, Response, write_msg};
+use crate::transfer::commands::{exchange_commands, wire_commands};
 use crate::transfer::home::resolve;
 use crate::transfer::ignored;
-use crate::transfer::projects::{default_path, exchange_commands, wire_commands};
+use crate::transfer::projects::default_path;
 use std::collections::HashMap;
 use std::net::SocketAddr;
 use std::path::PathBuf;
@@ -91,9 +92,19 @@ pub async fn handle<S: AsyncRead + AsyncWrite + Unpin + Send>(
             folder,
             dirs,
         } => scanned::count_files(ctx, state, project, folder, dirs).await,
-        Request::ExchangeCommands { project, commands } => {
-            match exchange_commands(ctx.shared, project, &wire_commands(&commands)).await {
-                Ok(merged) => Response::Commands(merged),
+        Request::ExchangeCommands {
+            project,
+            commands,
+            shared,
+        } => {
+            let theirs = wire_commands(&commands);
+            match exchange_commands(ctx.shared, project, &theirs, shared.as_deref()).await {
+                // An asker that sent none can't read them back.
+                Ok((commands, library)) if shared.is_some() => Response::CommandsWithShared {
+                    commands,
+                    shared: library,
+                },
+                Ok((commands, _)) => Response::Commands(commands),
                 Err(e) => refused(format!("Could not save the commands: {e:#}")),
             }
         }

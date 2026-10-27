@@ -59,6 +59,7 @@ async fn start(answer: Option<Option<Permissions>>) -> Instance {
         settings: Arc::new(RwLock::new(settings)),
         peers: Arc::new(RwLock::new(Vec::new())),
         projects: Arc::new(RwLock::new(Vec::new())),
+        shared_commands: Default::default(),
         store: Arc::new(store),
         identity: Arc::new(identity),
         events: tx,

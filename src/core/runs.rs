@@ -1,7 +1,7 @@
 //! Running a project's commands here and collecting their output for the UI.
 //! Output goes only to the UI, never to the log.
 
-use super::projects::live_command;
+use super::commands::live_command;
 use super::state::{CommandRun, OutputLine, RunStatus};
 use super::{Core, lock};
 use crate::commands::{self, CommandOutput};

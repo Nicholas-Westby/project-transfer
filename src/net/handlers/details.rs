@@ -8,8 +8,9 @@ use crate::merge::merge_commands;
 use crate::model::{FolderId, Project, ProjectId};
 use crate::net::NetEvent;
 use crate::protocol::Response;
+use crate::transfer::commands::{update_commands, wire_commands};
 use crate::transfer::home::{check_overlap, expand, resolve_all, too_broad};
-use crate::transfer::projects::{adopt, update_projects, wire_commands};
+use crate::transfer::projects::{adopt, update_projects};
 use crate::transfer::validate_name;
 use std::collections::HashMap;
 use std::path::{Component, Path};
@@ -28,7 +29,9 @@ pub async fn sync(ctx: &Ctx<'_>, project: Project, hints: HashMap<FolderId, Stri
     let pf = ctx.shared.settings.read().await.projects_folder.clone();
     let hints = resolve_all(&hints, ctx.shared.home.as_deref());
     let commands = wire_commands(&project.commands);
-    let added = update_projects(ctx.shared, |all| {
+    // Through `update_commands`, so a link to a shared command this computer
+    // hasn't heard of yet adds it.
+    let added = update_commands(ctx.shared, |all, _| {
         let before = all
             .iter()
             .find(|p| p.id == project.id)

@@ -78,6 +78,7 @@ pub fn seeded_state() -> UiState {
         updated_at_ms: 0,
         deleted: false,
         last_run_hash: None,
+        linked_to: None,
     };
     let hooks = Command {
         last_run_hash: Some(project_transfer::commands::command_hash(&hooks)),
@@ -91,6 +92,7 @@ pub fn seeded_state() -> UiState {
         updated_at_ms: 0,
         deleted: false,
         last_run_hash: None,
+        linked_to: None,
     };
     let folder = |n, name: &str, path: &str| Folder {
         id: id(n),

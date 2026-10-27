@@ -1,7 +1,9 @@
 //! Messages exchanged between instances and their length-prefixed framing.
 
 use crate::ignore_rules::IgnoreSpec;
-use crate::model::{Command, FolderId, InstanceId, Os, Permissions, Project, ProjectId};
+use crate::model::{
+    Command, FolderId, InstanceId, Os, Permissions, Project, ProjectId, SharedCommand,
+};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::net::IpAddr;
@@ -163,10 +165,13 @@ pub enum Request {
         project: ProjectId,
         files: u64,
     },
-    /// Commands without `last_run_hash`.
+    /// Commands without `last_run_hash`, and every shared command the asker
+    /// knows. Older versions send no shared commands, and get `Commands`.
     ExchangeCommands {
         project: ProjectId,
         commands: Vec<Command>,
+        #[serde(default)]
+        shared: Option<Vec<SharedCommand>>,
     },
     /// The project's details without any files, as in `BeginPush`: the
     /// receiver takes in its folders, description and commands and answers
@@ -259,6 +264,12 @@ pub enum Response {
     },
     /// The merged list, without `last_run_hash`.
     Commands(Vec<Command>),
+    /// `Commands` with every shared command the answering computer has
+    /// after the merge, for an asker that sent its own.
+    CommandsWithShared {
+        commands: Vec<Command>,
+        shared: Vec<SharedCommand>,
+    },
     Ok,
     Refused {
         reason: String,

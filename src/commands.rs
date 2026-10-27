@@ -194,6 +194,7 @@ mod tests {
             updated_at_ms: 0,
             deleted: false,
             last_run_hash: last,
+            linked_to: None,
         }
     }
 

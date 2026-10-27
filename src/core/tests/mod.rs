@@ -9,6 +9,7 @@ mod listed;
 mod paired;
 mod projects;
 mod reach;
+mod shared;
 mod sync;
 mod viewer;
 

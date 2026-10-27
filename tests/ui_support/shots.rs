@@ -1,5 +1,7 @@
 //! Renders each screen and dialog to PNG files for a person to look at.
 
+mod commands;
+
 use super::{FakeBackend, SIZE, sample_preview, with_pair_prompt};
 use egui_kittest::Harness;
 use egui_kittest::kittest::Queryable;
@@ -201,6 +203,7 @@ pub fn all(dir: &Path) {
     shot(dir, "16-command-editor", FakeBackend::seeded(), |h| {
         h.get_by_label("Add command").click_accesskit();
     });
+    commands::all(dir);
     shot(
         dir,
         "17-confirm-send-everything",

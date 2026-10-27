@@ -15,6 +15,7 @@ pub mod naming;
 pub mod nap;
 pub mod net;
 pub mod protocol;
+pub mod shared_commands;
 pub mod store;
 pub mod transfer;
 pub mod ui;

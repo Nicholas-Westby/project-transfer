@@ -48,6 +48,7 @@ mod tests {
             updated_at_ms: at,
             deleted: false,
             last_run_hash: None,
+            linked_to: None,
         }
     }
 

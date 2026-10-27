@@ -35,6 +35,7 @@ pub(super) fn shared(
         settings: Arc::new(RwLock::new(settings)),
         peers: Arc::new(RwLock::new(vec![])),
         projects: Arc::new(RwLock::new(vec![])),
+        shared_commands: Default::default(),
         store: Arc::new(store),
         identity: Arc::new(identity),
         events: tx,

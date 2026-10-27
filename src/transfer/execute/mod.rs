@@ -1,12 +1,10 @@
 //! Applying a confirmed preview: folders first, then files, times, removals.
 
+use super::commands::swap_commands;
 use super::home::{hints_for, resolve};
 use super::prepare::{check_peer, local_project, unexpected};
 use super::preview::{FolderPreview, Preview};
-use super::projects::{
-    StartedBy, adopt, exchange_commands, record_transfer, update_projects, wire_commands,
-    wire_project,
-};
+use super::projects::{StartedBy, adopt, record_transfer, update_projects, wire_project};
 use super::{Applier, Progress, Summary, clear_leftovers};
 use crate::logging::one_line;
 use crate::manifest::{Change, Entry, Kind};
@@ -147,17 +145,7 @@ impl Run<'_> {
             };
             self.folder(&side, fp).await?;
         }
-        let mine = local_project(shared, req.project).await.map(|p| p.commands);
-        let ex = Request::ExchangeCommands {
-            project: req.project,
-            commands: wire_commands(&mine.unwrap_or_default()),
-        };
-        match self.conn.request(&ex).await? {
-            Response::Commands(theirs) => {
-                exchange_commands(shared, req.project, &theirs).await?;
-            }
-            other => return Err(unexpected(self.conn, "the command exchange", other)),
-        }
+        swap_commands(self.conn, shared, req.project).await?;
         let end = match req.direction {
             Direction::Push => Request::EndPush,
             Direction::Pull => Request::EndPull {

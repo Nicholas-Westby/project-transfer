@@ -1,4 +1,5 @@
 use super::*;
+use crate::model::Command;
 use uuid::Uuid;
 
 fn folder(name: &str, path: Option<&str>) -> Folder {
@@ -124,6 +125,7 @@ fn wire_forms_drop_local_state() {
         updated_at_ms: 1,
         deleted: false,
         last_run_hash: Some("h".into()),
+        linked_to: None,
     }];
     let w = wire_project(&p);
     assert_eq!(w.folders[0].local_path, None);

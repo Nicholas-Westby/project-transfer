@@ -4,8 +4,10 @@
 //! never waits for it.
 
 mod actions;
+mod commands;
 mod details;
 mod found;
+mod library;
 mod pairing;
 mod peers;
 mod poll;
@@ -114,7 +116,14 @@ impl AppCore {
         let mut settings = store.load_or_create_instance()?;
         let identity = Identity::load_or_create(&store.identity_dir())?;
         let peers = store.load_peers()?;
-        let projects = store.load_projects()?;
+        let mut projects = store.load_projects()?;
+        let mut library = store.load_shared_commands()?;
+        // A crash between saving the two files, or a lost one, leaves them
+        // out of step; fix that before anything reads them.
+        if crate::shared_commands::reconcile(&mut projects, &mut library) {
+            store.save_shared_commands(&library)?;
+            store.save_projects(&projects)?;
+        }
         let runtime = tokio::runtime::Builder::new_multi_thread()
             .worker_threads(2)
             .thread_name("project-transfer")
@@ -135,6 +144,7 @@ impl AppCore {
         let (events, net_rx) = mpsc::unbounded_channel();
         let mut state = UiState::new(settings.clone(), port);
         state.projects = projects.clone();
+        state.shared_commands = library.clone();
         state.selected_peer = settings
             .last_peer
             .filter(|id| peers.iter().any(|p| p.id == *id));
@@ -144,6 +154,7 @@ impl AppCore {
             settings: Arc::new(RwLock::new(settings.clone())),
             peers: Arc::new(RwLock::new(peers)),
             projects: Arc::new(RwLock::new(projects)),
+            shared_commands: Arc::new(RwLock::new(library)),
             store: Arc::new(store),
             identity: Arc::new(identity),
             events,

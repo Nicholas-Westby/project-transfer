@@ -251,11 +251,14 @@ async fn commands_merge_on_both_sides_and_run_hashes_stay_local() {
         assert_eq!(saved[0].commands, cmds);
     }
 
-    // The reply over the wire carries no run hashes either.
+    // The reply over the wire carries no run hashes either. An asker that
+    // sends no shared commands, as older versions don't, gets the answer
+    // those versions read.
     let mut conn = a.open(&b).await;
     let ex = Request::ExchangeCommands {
         project: p.id,
         commands: vec![],
+        shared: None,
     };
     match conn.request(&ex).await.unwrap() {
         Response::Commands(c) => {

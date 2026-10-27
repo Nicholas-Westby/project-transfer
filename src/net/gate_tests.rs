@@ -86,6 +86,7 @@ fn all_requests() -> Vec<(Request, Need)> {
             R::ExchangeCommands {
                 project: u(),
                 commands: vec![],
+                shared: None,
             },
             Need::PullOrPush,
         ),

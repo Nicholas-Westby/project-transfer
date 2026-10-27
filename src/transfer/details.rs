@@ -3,10 +3,11 @@
 //! new folder, so it couldn't say where the folder would land until files
 //! were on their way.
 
+use super::commands::swap_commands;
 use super::home::{hints_for, resolve};
 use super::link::{self, Link};
 use super::prepare::{local_project, unexpected};
-use super::projects::{adopt, exchange_commands, update_projects, wire_commands, wire_project};
+use super::projects::{adopt, update_projects, wire_project};
 use super::validate_name;
 use crate::model::{Folder, FolderId, Project, ProjectId};
 use crate::net::{Connection, Shared};
@@ -76,18 +77,9 @@ pub async fn sync_details(
         adopt(all, &incoming, &pf, &HashMap::new(), &hints)
     })
     .await?;
-    // The other computer merged ours already; this brings its list back.
-    let mine = local_project(shared, project).await.map(|p| p.commands);
-    let ex = Request::ExchangeCommands {
-        project,
-        commands: wire_commands(&mine.unwrap_or_default()),
-    };
-    match conn.request(&ex).await? {
-        Response::Commands(theirs) => {
-            exchange_commands(shared, project, &theirs).await?;
-        }
-        other => return Err(unexpected(conn, "the command exchange", other)),
-    }
+    // The other computer took our commands with the details; this brings
+    // its list back and swaps the shared commands both ways.
+    swap_commands(conn, shared, project).await?;
     conn.close().await;
     info!("synced details of {} with {name}", local.name);
     Ok(Synced { project, link })

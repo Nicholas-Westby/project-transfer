@@ -84,6 +84,14 @@
 15-peer-offline
 15b-peer-shares-nothing
 16-command-editor
+16b-command-rows-shared
+16c-add-from-shared
+16d-add-shared-linked-here
+16e-edit-shared-from-list
+16f-delete-shared
+16g-edit-linked-command
+16h-new-command-share
+16i-add-from-shared-light
 16u32
 16x16
 17-confirm-send-everything
@@ -120,6 +128,8 @@
 65e5
 672c
 7d8b6c1e-2f4a-4b5c-9d6e-0f1a2b3c4d5e
+7d8b6c1e-2f4a-4b5c-9d6e-0f1a2b3c4d5f
+7d8b6c1e-2f4a-4b5c-9d6e-0f1a2b3c4d60
 7u8
 850-entry
 8a9e
@@ -529,6 +539,7 @@ capacity
 capital
 capitals
 caps
+caption
 capture
 captures
 capturing
@@ -538,6 +549,7 @@ cargo-ran-with
 carries
 carrot
 carry
+carrying
 case
 case-insensitive
 cases
@@ -620,6 +632,7 @@ clever
 cli
 click
 clicked
+clicking
 clicks
 client
 clients
@@ -876,6 +889,7 @@ deleted
 deletes
 deleting
 deletion
+deletion's
 deletions
 deliberately
 delta
@@ -884,6 +898,7 @@ denied
 dep
 depend
 dependencies
+deploy
 deprecated
 deps
 depth
@@ -992,6 +1007,7 @@ dolphin
 don't
 done
 dot
+dotnet
 dots
 double
 double-clicking
@@ -1197,6 +1213,7 @@ faint
 fake
 fakes
 falcon
+fall
 fallbacks
 falls
 false
@@ -1769,6 +1786,7 @@ linguistic
 lining
 link
 link-local
+linked
 links
 lint
 lints
@@ -2241,6 +2259,7 @@ parent
 parents
 parrot
 parse
+parsed
 parser's
 parses
 parsing
@@ -2553,6 +2572,8 @@ receives
 receiving
 recent
 recently
+reconcile
+reconciling
 record
 recorded
 recording
@@ -2628,6 +2649,7 @@ renders
 repaint
 repainting
 repairing
+repairs
 repeat
 repeated
 repeatedly
@@ -2874,6 +2896,7 @@ sent
 sentence
 sentences
 sep
+separate
 separated
 separately
 separates
@@ -2913,12 +2936,14 @@ shaped
 share
 shareable
 shared
+shared-commands
 shares
 sharing
 sheet
 sheet's
 sheets
 shell
+ship
 shop
 short
 shortcut
@@ -3053,6 +3078,7 @@ staged
 stages
 stake
 stale
+stamp
 stamped
 stand
 stand-alone
@@ -3154,6 +3180,8 @@ survives
 surviving
 svg
 swap
+swapping
+swaps
 swept
 swift
 switched
@@ -3266,6 +3294,7 @@ ticked
 ticks
 tide
 tide-tables
+tides
 tidy
 tie
 tied
@@ -3393,6 +3422,7 @@ unclaimed
 unclear
 unclosed
 under
+underneath
 undo
 undoes
 unequally
@@ -3413,6 +3443,10 @@ unix
 unknown
 unless
 unlike
+unlink
+unlinked
+unlinking
+unlinks
 unmodified
 unnamed
 unpair
@@ -3429,6 +3463,7 @@ unrelated
 unsafe
 unseen
 unset
+unshared
 unspecified
 unstaged
 unstagedword

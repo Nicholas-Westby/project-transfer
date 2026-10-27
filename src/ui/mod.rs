@@ -3,6 +3,8 @@
 //! of `UiState` per frame and sends `Action`s back.
 
 mod activity;
+pub mod add_command;
+pub mod command_editor;
 mod commands_view;
 mod computers;
 mod confirmations;
@@ -79,12 +81,8 @@ pub enum Sheet {
         offered: Permissions,
     },
     Settings(settings::Draft),
-    CommandEditor {
-        project: ProjectId,
-        id: Option<CommandId>,
-        label: String,
-        line: String,
-    },
+    AddCommand(add_command::Draft),
+    EditCommand(command_editor::Draft),
     PeerFolder(peer_folder::PeerFolderDraft),
 }
 
@@ -232,12 +230,8 @@ impl App {
                 offered,
             } => self.pair_setup_sheet(ui, s, target, requested, offered),
             Sheet::Settings(draft) => self.settings_sheet(ui, s, draft),
-            Sheet::CommandEditor {
-                project,
-                id,
-                label,
-                line,
-            } => self.command_editor(ui, project, id, label, line),
+            Sheet::AddCommand(draft) => self.add_command_sheet(ui, s, draft),
+            Sheet::EditCommand(draft) => self.edit_command_sheet(ui, s, draft),
             Sheet::PeerFolder(draft) => self.peer_folder_sheet(ui, s, draft),
         }
     }

@@ -107,3 +107,16 @@ fn a_scan_from_an_older_version_names_no_ignored_folders() {
     assert!(scan.manifest.ignored_dirs.is_empty());
     assert_eq!(scan.manifest.ignored_in_dir.get(""), Some(&3));
 }
+
+#[test]
+fn a_command_exchange_from_an_older_version_carries_no_shared_commands() {
+    let old = r#"{"ExchangeCommands":{"project":"00000000-0000-0000-0000-00000000000a",
+        "commands":[]}}"#;
+    let parsed: Request = serde_json::from_str(old).unwrap();
+    let want = Request::ExchangeCommands {
+        project: uuid::Uuid::from_u128(10),
+        commands: vec![],
+        shared: None,
+    };
+    assert_eq!(parsed, want);
+}

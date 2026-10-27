@@ -1,12 +1,13 @@
-//! A project's commands: run, stop, read the output, add, edit, delete.
+//! A project's commands: run, stop, read the output, add, edit, unlink,
+//! delete.
 
 use super::theme::{CONTROL_RADIUS, Palette};
 use super::widgets::{self, mono};
-use super::{App, Confirm, Sheet, dialogs};
+use super::{App, Confirm, Sheet, add_command, command_editor};
 use crate::commands::must_confirm;
 use crate::core::{Action, CommandRun, RunStatus, UiState};
 use crate::model::{Command, CommandId, Os, Project, ProjectId};
-use egui::{Align, Frame, Layout, Margin, RichText, ScrollArea, Sides, TextEdit, Ui};
+use egui::{Align, Frame, Layout, Margin, RichText, ScrollArea, Sides, Ui};
 
 impl App {
     pub(super) fn commands_section(&mut self, ui: &mut Ui, s: &UiState, p: &Project) {
@@ -14,12 +15,7 @@ impl App {
             widgets::section(ui, "Commands");
             ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
                 if ui.button("Add command").clicked() {
-                    self.view.sheet = Sheet::CommandEditor {
-                        project: p.id,
-                        id: None,
-                        label: String::new(),
-                        line: String::new(),
-                    };
+                    self.view.sheet = Sheet::AddCommand(add_command::Draft::new(p.id));
                 }
             });
         });
@@ -43,11 +39,18 @@ impl App {
         let pal = Palette::of(ui.ctx());
         let run = s.command_runs.get(&c.id);
         let running = run.is_some_and(|r| r.status == RunStatus::Running);
+        let linked = c.linked_to.is_some();
         // The buttons on the right go first; the command line gives way.
-        let (start, (delete, edit, stop)) = Sides::new().shrink_left().truncate().show(
+        let (start, (delete, edit, unlink, stop)) = Sides::new().shrink_left().truncate().show(
             ui,
             |ui| {
                 let r = ui.add_enabled(!running, egui::Button::new(format!("▶ {}", c.label)));
+                if linked {
+                    widgets::badge(ui, "Shared").on_hover_text(
+                        "Linked to a shared command: editing it changes every project that uses \
+                         it.",
+                    );
+                }
                 let note = (c.created_on != Os::current()).then(|| {
                     let text = format!("Made on {}", os_name(c.created_on));
                     RichText::new(text).small().color(pal.muted())
@@ -67,8 +70,9 @@ impl App {
             |ui| {
                 let delete = widgets::quiet(ui, "Delete", Some(pal.removed)).clicked();
                 let edit = widgets::quiet(ui, "Edit", None).clicked();
+                let unlink = linked && widgets::quiet(ui, "Unlink", None).clicked();
                 let stop = running && widgets::quiet(ui, "Stop", Some(pal.removed)).clicked();
-                (delete, edit, stop)
+                (delete, edit, unlink, stop)
             },
         );
         if start {
@@ -78,12 +82,10 @@ impl App {
             self.view.confirm = Some(Confirm::DeleteCommand(p.id, c.id));
         }
         if edit {
-            self.view.sheet = Sheet::CommandEditor {
-                project: p.id,
-                id: Some(c.id),
-                label: c.label.clone(),
-                line: c.line.clone(),
-            };
+            self.view.sheet = Sheet::EditCommand(command_editor::Draft::of(p.id, c));
+        }
+        if unlink {
+            self.act(Action::UnlinkCommand(p.id, c.id));
         }
         if stop {
             self.act(Action::StopCommand(c.id));
@@ -152,72 +154,6 @@ impl App {
                     self.view.hidden_output.insert(id);
                 }
             });
-    }
-
-    pub(super) fn command_editor(
-        &mut self,
-        ui: &mut Ui,
-        project: ProjectId,
-        id: Option<CommandId>,
-        mut label: String,
-        mut line: String,
-    ) {
-        let r = dialogs::sheet(ui, "command_editor", 520.0, true, |ui| {
-            let title = if id.is_some() {
-                "Edit command"
-            } else {
-                "Add command"
-            };
-            dialogs::sheet_title(ui, title);
-            widgets::muted(ui, "Label");
-            ui.add(
-                TextEdit::singleline(&mut label)
-                    .hint_text(widgets::hint("Fetch dependencies"))
-                    .desired_width(f32::INFINITY),
-            );
-            ui.add_space(8.0);
-            widgets::muted(ui, "Command");
-            ui.add(
-                TextEdit::multiline(&mut line)
-                    .font(egui::TextStyle::Monospace)
-                    .hint_text(widgets::hint("make deps").monospace())
-                    .desired_rows(3)
-                    .desired_width(f32::INFINITY),
-            );
-            let shell = if cfg!(windows) {
-                "Runs with PowerShell in the primary folder, only on the computer where you click it."
-            } else {
-                "Runs with your login shell in the primary folder, only on the computer where you \
-                 click it."
-            };
-            widgets::small_muted(ui, shell);
-            let ok = !label.trim().is_empty() && !line.trim().is_empty();
-            let confirm = if id.is_some() {
-                "Save command"
-            } else {
-                "Add command"
-            };
-            dialogs::button_row(ui, confirm, false, ok)
-        });
-        match (r.dismissed, r.inner) {
-            (true, _) | (_, Some(false)) => self.view.sheet = Sheet::None,
-            (_, Some(true)) => {
-                let (l, c) = (label.trim().to_string(), line.trim().to_string());
-                self.act(match id {
-                    Some(id) => Action::EditCommand(project, id, l, c),
-                    None => Action::AddCommand(project, l, c),
-                });
-                self.view.sheet = Sheet::None;
-            }
-            _ => {
-                self.view.sheet = Sheet::CommandEditor {
-                    project,
-                    id,
-                    label,
-                    line,
-                }
-            }
-        }
     }
 }
 
