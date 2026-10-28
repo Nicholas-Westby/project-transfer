@@ -1,6 +1,3 @@
-+checkout's
-+copes
-+cr
-+eol
-+interpreter
-+originals
++cant
+-clashes
++holdable

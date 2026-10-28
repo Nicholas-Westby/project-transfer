@@ -3,7 +3,8 @@
 //! preview takes them from here instead of reading them again.
 
 use super::prepare::unexpected;
-use super::preview::{FolderPreview, LeftOut, Replaced, drop_unholdable, replaced_folders};
+use super::preview::{FolderPreview, LeftOut, Replaced};
+use super::unholdable::{drop_unholdable, replaced_folders};
 use super::{ignored, safe_join};
 use crate::ignore_rules::{IgnoreSpec, Matcher};
 use crate::manifest::{Kind, Manifest, compare, compose_for, hash_file, resolve_hashes, scan};
@@ -59,6 +60,7 @@ pub(super) struct Sides {
     pub(super) local_root: PathBuf,
     pub(super) local_is_src: bool,
     pub(super) dest_exists: bool,
+    pub(super) src_os: Os,
     pub(super) dest_os: Os,
 }
 
@@ -218,9 +220,9 @@ impl Ctx<'_> {
             dst.entries.len(),
             plan.changes.len()
         );
-        let (plan, skipped, case_clashes) = drop_unholdable(plan, src, dst, s.dest_os);
-        let mut replaced = replaced_folders(&plan, dst);
-        replaced.extend(case_clashes);
+        let held = drop_unholdable(plan, src, dst, s.src_os, s.dest_os);
+        let mut replaced = replaced_folders(&held.plan, dst);
+        replaced.extend(held.replaced);
         self.warnings.extend(replaced.iter().map(Replaced::warning));
         Ok(FolderPreview {
             folder: s.folder,
@@ -228,8 +230,9 @@ impl Ctx<'_> {
             source_path: s.src.1,
             dest_path: s.dst.1,
             dest_will_be_created: !s.dest_exists,
-            plan,
-            skipped,
+            plan: held.plan,
+            skipped: held.skipped,
+            left_in_place: held.left_in_place,
             replaced,
             leftovers,
         })

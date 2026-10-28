@@ -27,7 +27,7 @@ fn tally(
 ) -> Tally {
     let same: HashSet<String> = same.iter().map(|s| s.to_string()).collect();
     let mut t = Tally::default();
-    tally_folder(&mut t, here, there, &same, since);
+    tally_folder(&mut t, here, there, &same, since, false);
     t
 }
 
@@ -243,4 +243,23 @@ fn a_copy_with_only_a_repository_counts_as_missing() {
     let t = tally(Some(&fresh), Some(&full), &[], Some(1000));
     assert_eq!((t.here, t.there), (1, 2));
     assert_eq!(t.removed_here, 0);
+}
+
+#[test]
+fn names_windows_cant_hold_count_for_neither_side_next_to_windows() {
+    // A push to Windows skips them and a pull from it leaves them in place,
+    // so they move neither way.
+    let here = folder(vec![
+        file("a.txt", 3, 100),
+        file("CON.txt", 3, 100),
+        file("notes/b?.txt", 3, 500),
+    ]);
+    let there = folder(vec![file("a.txt", 3, 100)]);
+    let mut t = Tally::default();
+    let none = HashSet::new();
+    tally_folder(&mut t, Some(&here), Some(&there), &none, Some(200), true);
+    assert_eq!((t.here, t.there), (0, 0));
+    // Between two Macs, CON.txt was removed there and b?.txt is new here.
+    let t = tally(Some(&here), Some(&there), &[], Some(200));
+    assert_eq!((t.here, t.there, t.removed_there), (1, 1, 1));
 }

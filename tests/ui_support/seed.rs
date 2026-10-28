@@ -280,6 +280,7 @@ pub fn sample_preview(s: &UiState) -> Preview {
             "aux.txt".into(),
             "`aux.txt` is a reserved name on Windows.".into(),
         )],
+        left_in_place: vec![],
         replaced: vec![],
         leftovers: vec![],
     };
@@ -294,6 +295,7 @@ pub fn sample_preview(s: &UiState) -> Preview {
             needs_hash: vec![],
         },
         skipped: vec![],
+        left_in_place: vec![],
         replaced: vec![],
         leftovers: vec![],
     };

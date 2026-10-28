@@ -32,6 +32,7 @@ fn preview(direction: Direction, changes: Vec<Change>) -> Preview {
                 needs_hash: vec![],
             },
             skipped: vec![("aux.txt".into(), "`aux.txt` is reserved on Windows.".into())],
+            left_in_place: vec![],
             replaced: vec![],
             leftovers: vec![],
         }],
@@ -114,6 +115,17 @@ fn a_skipped_name_is_listed_once_and_summed_up_on_top() {
     assert_eq!(skipped(&p), ["aux.txt is reserved on Windows."]);
     let w = warnings(&p, "Desk");
     assert_eq!(w, ["1 file can't be copied to Desk and will be skipped."]);
+}
+
+#[test]
+fn a_name_left_in_place_is_listed_but_not_counted_as_skipped() {
+    let mut p = preview(Direction::Pull, vec![]);
+    let why = "`CON.txt` is a reserved name on Windows. The copy on Windows can't have it, so \
+               it is left in place.";
+    p.folders[0].skipped.clear();
+    p.folders[0].left_in_place = vec![("CON.txt".into(), why.into())];
+    assert_eq!(skipped(&p), [why.replace('`', "")]);
+    assert!(warnings(&p, "Desk").is_empty(), "nothing happens to it");
 }
 
 #[test]

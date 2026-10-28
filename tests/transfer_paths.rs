@@ -201,12 +201,12 @@ async fn a_destination_file_with_a_backslash_is_left_and_the_push_finishes() {
     write(&b.dev().join("app"), "odd\\name.txt", "b");
     write(&src, "new.txt", "n");
     let (preview, summary) = push(&a, &b, p.id, false).await;
-    let skipped: Vec<&str> = preview.folders[0]
-        .skipped
+    let left: Vec<&str> = preview.folders[0]
+        .left_in_place
         .iter()
         .map(|(r, _)| r.as_str())
         .collect();
-    assert_eq!(skipped, ["odd\\name.txt"]);
+    assert_eq!(left, ["odd\\name.txt"]);
     assert!(summary.failures.is_empty(), "{:?}", summary.failures);
     assert_eq!(read(&b.dev().join("app"), "new.txt"), "n");
     assert_eq!(read(&b.dev().join("app"), "odd\\name.txt"), "b");

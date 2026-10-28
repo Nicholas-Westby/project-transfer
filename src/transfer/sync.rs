@@ -9,7 +9,7 @@ use super::scans::{Ask, Ctx, Scans};
 use super::sync_count::{SyncChoice, Tally, tally_folder};
 use crate::ignore_rules::{IgnoreSpec, Matcher};
 use crate::manifest::{Kind, Manifest, compare, compose_for};
-use crate::model::{Direction, FolderId, InstanceSettings, Project};
+use crate::model::{Direction, FolderId, InstanceSettings, Os, Project};
 use crate::net::{Connection, Shared};
 use crate::protocol::{ProjectSummary, RemoteProject, Request, Response};
 use anyhow::{Context, anyhow, bail};
@@ -230,13 +230,15 @@ impl Look<'_> {
                 ctx.scans.hashes.insert(f.id, (local, remote_hashes));
             }
         }
+        let windows = Os::current() == Os::Windows || remote.os == Os::Windows;
         match &self.usual {
             Some(u) => {
                 let mine = here.as_ref().map(|m| kept(m, u));
                 let theirs = there.map(|m| kept(m, u));
-                tally_folder(tally, mine.as_ref(), theirs.as_ref(), &same, self.since);
+                let (mine, theirs) = (mine.as_ref(), theirs.as_ref());
+                tally_folder(tally, mine, theirs, &same, self.since, windows);
             }
-            None => tally_folder(tally, here.as_ref(), there, &same, self.since),
+            None => tally_folder(tally, here.as_ref(), there, &same, self.since, windows),
         }
         if let (Some(root), Some(m)) = (&f.here, here) {
             ctx.scans.local.insert((root.clone(), compose), m);

@@ -16,6 +16,7 @@ pub mod projects;
 mod scans;
 pub mod sync;
 pub mod sync_count;
+mod unholdable;
 
 pub use apply::{Applier, PendingFile};
 pub use details::{Synced, set_peer_folder_path, sync_details};
@@ -24,11 +25,9 @@ pub use leftovers::clear_leftovers;
 pub use op::Op;
 pub use paths::{safe_join, validate_name, validate_rel};
 pub use prepare::prepare;
-pub use preview::{
-    Counts, FolderPreview, LeftOut, Preview, Replaced, TransferRequest, drop_unholdable,
-    replaced_folders,
-};
+pub use preview::{Counts, FolderPreview, LeftOut, Preview, Replaced, TransferRequest};
 pub use sync::prepare_sync;
+pub use unholdable::{drop_unholdable, replaced_folders};
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum Progress {

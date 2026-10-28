@@ -40,6 +40,7 @@ fn folder(name: &str, changes: Vec<Change>, replaced: Vec<Replaced>) -> FolderPr
             needs_hash: vec![],
         },
         skipped: vec![("aux.txt".into(), "reserved".into())],
+        left_in_place: vec![],
         replaced,
         leftovers: vec![],
     }
@@ -167,11 +168,11 @@ fn compared(src: &Path, dst: &Path, m: &Matcher) -> Preview {
     let (s, d) = (scan(src, m, false).unwrap(), scan(dst, m, false).unwrap());
     let plan = compare(&s, &d);
     assert!(plan.needs_hash.is_empty());
-    let (plan, skipped, clashes) = drop_unholdable(plan, &s, &d, Os::MacOs);
-    let mut replaced = replaced_folders(&plan, &d);
-    replaced.extend(clashes);
-    let mut p = preview(vec![folder("app", plan.changes, replaced)]);
-    p.folders[0].skipped = skipped;
+    let held = drop_unholdable(plan, &s, &d, Os::MacOs, Os::MacOs);
+    let mut replaced = replaced_folders(&held.plan, &d);
+    replaced.extend(held.replaced);
+    let mut p = preview(vec![folder("app", held.plan.changes, replaced)]);
+    p.folders[0].skipped = held.skipped;
     p
 }
 

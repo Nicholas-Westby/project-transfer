@@ -1,5 +1,6 @@
 use super::*;
-use crate::manifest::{Entry, compare};
+use crate::manifest::{Entry, Kind, Manifest, compare};
+use crate::transfer::replaced_folders;
 
 fn f(rel: &str) -> Entry {
     Entry {
@@ -35,17 +36,6 @@ fn man(mut entries: Vec<Entry>, ignored: &[(&str, u64)]) -> Manifest {
     }
 }
 
-fn rels(p: &Plan) -> Vec<String> {
-    p.changes
-        .iter()
-        .map(|c| match c {
-            Change::Add(e) | Change::TimestampOnly(e) => e.rel.clone(),
-            Change::Update { entry, .. } | Change::Replace { entry } => entry.rel.clone(),
-            Change::RemoveFile(r) | Change::RemoveDir { rel: r, .. } => format!("-{r}"),
-        })
-        .collect()
-}
-
 fn preview(plans: Vec<Plan>) -> Preview {
     Preview {
         request: TransferRequest {
@@ -64,6 +54,7 @@ fn preview(plans: Vec<Plan>) -> Preview {
                 dest_will_be_created: false,
                 plan,
                 skipped: vec![],
+                left_in_place: vec![],
                 replaced: vec![],
                 leftovers: vec![],
             })
@@ -125,144 +116,6 @@ fn counts_add_up_across_folders() {
         needs_hash: vec![],
     };
     assert!(!preview(vec![empty_dir]).is_empty());
-}
-
-#[test]
-fn windows_names_are_skipped_only_for_windows() {
-    let src = man(
-        vec![
-            f("ok.txt"),
-            d("aux"),
-            f("aux/in.txt"),
-            f("what?.md"),
-            link("l"),
-        ],
-        &[],
-    );
-    let plan = compare(&src, &Manifest::default());
-    let (kept, skipped, _) = drop_unholdable(plan.clone(), &src, &Manifest::default(), Os::MacOs);
-    assert_eq!(kept, plan);
-    assert!(skipped.is_empty());
-
-    let (kept, skipped, _) = drop_unholdable(plan, &src, &Manifest::default(), Os::Windows);
-    assert_eq!(rels(&kept), ["ok.txt"]);
-    let skipped: Vec<&str> = skipped.iter().map(|(r, _)| r.as_str()).collect();
-    assert_eq!(skipped, ["aux", "aux/in.txt", "l", "what?.md"]);
-}
-
-#[test]
-fn skip_reasons_say_why() {
-    let src = man(vec![f("CON.txt"), f("a?"), f("dot."), link("l")], &[]);
-    let (_, skipped, _) = drop_unholdable(
-        compare(&src, &Manifest::default()),
-        &src,
-        &Manifest::default(),
-        Os::Windows,
-    );
-    let reason = |r: &str| skipped.iter().find(|(x, _)| x == r).unwrap().1.clone();
-    assert!(
-        reason("CON.txt").contains("reserved"),
-        "{}",
-        reason("CON.txt")
-    );
-    assert!(reason("a?").contains('?'));
-    assert!(reason("dot.").contains("dot or space"));
-    assert!(reason("l").contains("link"));
-}
-
-#[test]
-fn case_collisions_skip_later_paths_and_their_children() {
-    let src = man(
-        vec![
-            f("README.md"),
-            f("Readme.md"),
-            d("Docs"),
-            d("docs"),
-            f("docs/a"),
-        ],
-        &[],
-    );
-    let (kept, skipped, _) = drop_unholdable(
-        compare(&src, &Manifest::default()),
-        &src,
-        &Manifest::default(),
-        Os::MacOs,
-    );
-    assert_eq!(rels(&kept), ["Docs", "README.md"]);
-    let skipped: Vec<&str> = skipped.iter().map(|(r, _)| r.as_str()).collect();
-    assert_eq!(skipped, ["Readme.md", "docs", "docs/a"]);
-}
-
-#[test]
-fn case_only_rename_does_not_remove_the_new_name() {
-    let src = man(vec![f("README.md"), d("src"), f("src/a")], &[]);
-    let dst = man(vec![f("readme.md"), d("Src"), f("Src/a"), f("gone")], &[]);
-    let (kept, _, replaced) = drop_unholdable(compare(&src, &dst), &src, &dst, Os::MacOs);
-    assert_eq!(rels(&kept), ["README.md", "src", "src/a", "-gone"]);
-    assert!(replaced.is_empty(), "same kinds: nothing hidden is removed");
-}
-
-#[test]
-fn case_only_kind_clash_is_counted_as_a_replacement() {
-    // `Foo` the file lands on `foo` the folder on a case-insensitive disk.
-    // `Baz` lands on an empty folder `baz`, which removes no file.
-    let src = man(vec![f("Foo"), d("bar"), f("Baz")], &[]);
-    let dst = man(
-        vec![d("foo"), f("foo/a"), f("foo/b"), f("BAR"), d("baz")],
-        &[("foo", 1), ("", 1)],
-    );
-    let (kept, _, replaced) = drop_unholdable(compare(&src, &dst), &src, &dst, Os::MacOs);
-    assert_eq!(rels(&kept), ["Baz", "Foo", "bar"]);
-    assert_eq!(
-        replaced,
-        vec![
-            Replaced {
-                rel: "BAR".into(),
-                files: 1,
-                ignored: 0,
-                by: "a folder".into(),
-                was_folder: false,
-            },
-            Replaced {
-                rel: "foo".into(),
-                files: 3,
-                ignored: 1,
-                by: "a file".into(),
-                was_folder: true,
-            },
-        ]
-    );
-    assert_eq!(replaced[0].warning(), "Replacing file `BAR` with a folder.");
-}
-
-#[test]
-fn backslash_names_are_skipped() {
-    let src = man(vec![f("a\\b"), f("ok")], &[]);
-    for os in [Os::MacOs, Os::Windows] {
-        let (kept, skipped, _) = drop_unholdable(
-            compare(&src, &Manifest::default()),
-            &src,
-            &Manifest::default(),
-            os,
-        );
-        assert_eq!(rels(&kept), ["ok"]);
-        assert!(skipped[0].1.contains("backslash"), "{:?}", skipped);
-    }
-}
-
-#[test]
-fn removing_a_destination_name_with_a_backslash_is_skipped() {
-    let src = man(vec![f("ok")], &[]);
-    let dst = man(vec![f("ok"), f("a\\b"), d("c\\d"), f("c\\d/e")], &[]);
-    let (kept, skipped, _) = drop_unholdable(compare(&src, &dst), &src, &dst, Os::MacOs);
-    assert!(
-        rels(&kept).iter().all(|r| !r.contains('\\')),
-        "{:?}",
-        rels(&kept)
-    );
-    let names: Vec<&str> = skipped.iter().map(|(r, _)| r.as_str()).collect();
-    assert_eq!(names, ["a\\b", "c\\d"]);
-    assert!(skipped[0].1.contains("left in place"), "{:?}", skipped);
 }
 
 #[test]

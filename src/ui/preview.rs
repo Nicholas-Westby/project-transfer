@@ -153,11 +153,12 @@ pub fn group(p: &Preview, peer: &str) -> Groups {
     g
 }
 
-/// Names the destination cannot hold, each with its reason.
+/// Names the transfer skips, each with its reason: those the destination
+/// cannot hold, then those it leaves in place there.
 pub fn skipped(p: &Preview) -> Vec<String> {
     p.folders
         .iter()
-        .flat_map(|f| f.skipped.iter())
+        .flat_map(|f| f.skipped.iter().chain(&f.left_in_place))
         .map(|(rel, why)| {
             let why = why.replace('`', "");
             if why.contains(rel.as_str()) {
@@ -203,7 +204,8 @@ pub fn warnings(p: &Preview, peer: &str) -> Vec<String> {
             .map(|r| r.warning()),
     );
     w.extend(p.warnings.iter().cloned());
-    // Each skipped name is listed under Skipped; the top only says how many.
+    // Each skipped name is listed under Skipped; the top only says how many
+    // won't arrive. Nothing happens to a name left in place.
     let n: u64 = p.folders.iter().map(|f| f.skipped.len() as u64).sum();
     if n > 0 {
         let dest = match p.request.direction {

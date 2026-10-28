@@ -154,6 +154,7 @@ pub(super) async fn prepare_with(
                     local_root: root,
                     local_is_src: true,
                     dest_exists: remote.exists,
+                    src_os: Os::current(),
                     dest_os: remote.os,
                 };
                 folders.push(ctx.plan(side).await?);
@@ -231,6 +232,7 @@ pub(super) async fn prepare_with(
                     dest_exists: dest.is_dir(),
                     local_root: dest,
                     local_is_src: false,
+                    src_os: remote.os,
                     dest_os: Os::current(),
                 };
                 folders.push(ctx.plan(side).await?);

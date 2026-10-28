@@ -540,6 +540,7 @@ cancels
 candidate
 cannot
 canonicalize
+cant
 cap
 capable
 capacity
@@ -626,7 +627,6 @@ claim
 claims
 clamp
 clash
-clashes
 clashing
 class
 claude
@@ -1508,6 +1508,7 @@ hints
 history
 hoc
 hold
+holdable
 holder
 holders
 holding

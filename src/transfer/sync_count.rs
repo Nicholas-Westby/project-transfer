@@ -1,6 +1,7 @@
 //! How a sync picks its direction: count the files each side changed more
 //! recently, and go from the side with more.
 
+use super::unholdable::windows_holds;
 use crate::manifest::{Kind, Manifest};
 use crate::model::Direction;
 use std::cmp::Ordering;
@@ -47,10 +48,12 @@ impl Tally {
 type Files<'a> = HashMap<&'a str, (u64, i64, bool)>;
 
 /// Each file of `m` by path, as (the project's files, the repository's
-/// own files under a `.git` folder). Folders and links are not counted.
-fn files(m: &Manifest) -> (Files<'_>, Files<'_>) {
+/// own files under a `.git` folder). Folders and links are not counted, nor
+/// with `windows` the names Windows can't hold.
+fn files(m: &Manifest, windows: bool) -> (Files<'_>, Files<'_>) {
     m.entries
         .iter()
+        .filter(|e| !windows || windows_holds(&e.rel))
         .filter_map(|e| match e.kind {
             Kind::File {
                 size,
@@ -66,17 +69,20 @@ fn files(m: &Manifest) -> (Files<'_>, Files<'_>) {
 /// each computer, None where it is missing; `same` holds the paths whose
 /// content matches although their times differ; `since` is when the last
 /// transfer between these two computers read the folders, if the project
-/// last moved between them.
+/// last moved between them; `windows` says either computer runs Windows.
 pub fn tally_folder(
     t: &mut Tally,
     here: Option<&Manifest>,
     there: Option<&Manifest>,
     same: &HashSet<String>,
     since: Option<i64>,
+    windows: bool,
 ) {
     let empty = Manifest::default();
-    let (mine, my_repo) = files(here.unwrap_or(&empty));
-    let (theirs, their_repo) = files(there.unwrap_or(&empty));
+    // A name Windows can't hold moves neither way: a push to it skips the
+    // file and a pull from it leaves the file in place.
+    let (mine, my_repo) = files(here.unwrap_or(&empty), windows);
+    let (theirs, their_repo) = files(there.unwrap_or(&empty), windows);
     // A file one side lacks was removed there only if that side has files
     // outside .git in the folder and the file is no newer than `since`,
     // when both sides had it. A copy with no files is far likelier new than

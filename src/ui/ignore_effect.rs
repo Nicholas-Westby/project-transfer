@@ -49,6 +49,7 @@ pub fn left_out(p: &Preview, m: &Matcher) -> Effect {
         let mut gone = gone.into_iter();
         f.plan.changes.retain(|_| gone.next() == Some(true));
         f.skipped.clear();
+        f.left_in_place.clear();
     }
     out.left_out.clear();
     out.warnings.clear();
