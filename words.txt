@@ -1269,6 +1269,7 @@ finally
 finch
 find
 finder
+finding
 finds
 fine
 fingerprint
@@ -3073,8 +3074,10 @@ specified
 speech
 speed
 speeds
+spelled
 spelling
 spellings
+spells
 spin
 spinner
 splat

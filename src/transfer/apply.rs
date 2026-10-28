@@ -1,5 +1,6 @@
 //! Writes a mirror to disk without ever leaving a half-written file.
 
+use super::case::match_case;
 use super::paths::{invalid, safe_join};
 use crate::ignore_rules::TEMP_SUFFIX;
 use crate::manifest::is_exec;
@@ -161,6 +162,7 @@ impl Applier {
         let path = safe_join(&self.root, rel)?;
         match std::fs::symlink_metadata(&path) {
             Ok(m) if m.is_dir() => {
+                match_case(&path);
                 note(&self.written, &path);
                 return Ok(());
             }
@@ -258,6 +260,7 @@ impl PendingFile {
         }
         make_writable(&self.dest);
         std::fs::rename(&self.tmp, &self.dest)?;
+        match_case(&self.dest);
         note(&self.written, &self.dest);
         Ok(())
     }

@@ -1,6 +1,7 @@
 //! Running a push or pull end to end: preview first, then apply.
 
 pub mod apply;
+mod case;
 pub mod commands;
 mod details;
 mod execute;
