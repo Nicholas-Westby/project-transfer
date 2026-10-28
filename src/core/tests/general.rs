@@ -169,7 +169,7 @@ fn last_peer_is_selected_again_at_start_and_unpair_forgets_it() {
     me.last_peer = Some(peer.id);
     store.save_instance(&me).unwrap();
 
-    let core = AppCore::start_with(store, None, opts()).unwrap();
+    let core = AppCore::start_with(store, None, opts(dir.path())).unwrap();
     assert_eq!(core.state().selected_peer, Some(peer.id));
     assert!(!core.state().peers[0].online);
     core.act(Action::Unpair(peer.id));
@@ -190,7 +190,7 @@ fn a_busy_saved_port_is_replaced_and_saved() {
     let mut me = store.load_or_create_instance().unwrap();
     me.port = taken;
     store.save_instance(&me).unwrap();
-    let core = AppCore::start_with(store, None, opts()).unwrap();
+    let core = AppCore::start_with(store, None, opts(dir.path())).unwrap();
     assert_ne!(core.port(), taken);
     assert_eq!(core.state().port, core.port());
     assert_eq!(
@@ -208,7 +208,7 @@ fn port_zero_tries_the_preferred_port_first() {
     drop(free);
     let o = StartOptions {
         preferred_port: preferred,
-        ..opts()
+        ..opts(dir.path())
     };
     let core = AppCore::start_with(store_in(dir.path()), None, o).unwrap();
     assert_eq!(core.port(), preferred);

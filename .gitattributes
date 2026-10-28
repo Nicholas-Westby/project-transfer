@@ -1,0 +1,5 @@
+# Git for Windows checks text files out with CRLF line ends by default. Its
+# sh copes, but a Mac's stops at "bad interpreter: /bin/sh^M", so these
+# would break in a Windows checkout copied over to a Mac.
+.githooks/pre-commit text eol=lf
+install text eol=lf

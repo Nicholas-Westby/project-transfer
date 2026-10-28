@@ -177,11 +177,14 @@ fn project_names_are_free_but_folder_names_are_checked() {
     assert_eq!(f.project().name, "a/b: CON");
 
     // A folder's name travels too, so one Windows can't hold is refused.
-    f.act(Action::AddFolder(p.id, f.folder("notes:old")));
+    // Windows can't make that folder at all, so there it gets a name no
+    // system takes.
+    let bad = if cfg!(windows) { " notes" } else { "notes:old" };
+    f.act(Action::AddFolder(p.id, f.folder(bad)));
     assert_eq!(f.project().folders.len(), 1);
     let line = f.last_activity().text;
     assert!(
-        line.contains("Folder name `notes:old`") && line.contains("Rename the folder"),
+        line.contains(&format!("Folder name `{bad}`")) && line.contains("Rename the folder"),
         "{line}"
     );
 }

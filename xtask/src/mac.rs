@@ -331,6 +331,9 @@ mod tests {
         assert!(refuse_root(501).is_ok());
     }
 
+    // Elsewhere the path joins with that system's separator; the pattern is
+    // only ever matched on a Mac.
+    #[cfg(target_os = "macos")]
     #[test]
     fn running_pattern_is_anchored_at_both_ends() {
         let p = running_pattern(Path::new("/Apps/Project Transfer.app"));

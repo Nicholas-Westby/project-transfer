@@ -1,2 +1,6 @@
-+meadow
-+twin
++checkout's
++copes
++cr
++eol
++interpreter
++originals

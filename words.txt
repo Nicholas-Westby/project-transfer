@@ -604,6 +604,7 @@ checkbox
 checked
 checking
 checkout
+checkout's
 checks
 cheetah
 chevron
@@ -782,6 +783,7 @@ convenience
 conventional
 convex
 cool
+copes
 copied
 copies
 copy
@@ -813,6 +815,7 @@ covers
 cow
 coyote
 cp
+cr
 crash
 crate
 crate's
@@ -1121,6 +1124,7 @@ env-filter
 environment
 envs
 eof
+eol
 epaint
 ephemeral
 epoch
@@ -1635,6 +1639,7 @@ interactive
 interface
 interfaces
 intermediates
+interpreter
 interrupted
 intersects
 into
@@ -2197,6 +2202,7 @@ ordering
 orders
 org
 original
+originals
 os
 other
 other's

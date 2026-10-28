@@ -16,11 +16,15 @@ mod viewer;
 
 use std::time::{Duration, Instant};
 
-pub(super) fn opts() -> StartOptions {
+/// Options for a core whose files live in `dir`. Its home is in there too:
+/// two cores sharing the real one would place each other's folders back on
+/// the originals whenever the temp folder is inside it, as on Windows.
+pub(super) fn opts(dir: &Path) -> StartOptions {
     StartOptions {
         discovery: false,
         bind_ip: IpAddr::V4(Ipv4Addr::LOCALHOST),
         preferred_port: 0,
+        home: Some(dir.join("user")),
     }
 }
 
@@ -32,7 +36,7 @@ pub(super) struct Fixture {
 impl Fixture {
     pub(super) fn new() -> Fixture {
         let dir = tempfile::tempdir().unwrap();
-        let core = AppCore::start_with(store_in(dir.path()), None, opts()).unwrap();
+        let core = AppCore::start_with(store_in(dir.path()), None, opts(dir.path())).unwrap();
         Fixture { dir, core }
     }
 

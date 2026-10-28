@@ -54,6 +54,9 @@ pub struct StartOptions {
     pub bind_ip: IpAddr,
     /// Tried first when the saved port is 0; 0 here means any free port.
     pub preferred_port: u16,
+    /// Folders inside it but outside the Projects folder land at the same
+    /// place under the other computer's home (`transfer::home`).
+    pub home: Option<PathBuf>,
 }
 
 impl Default for StartOptions {
@@ -62,6 +65,7 @@ impl Default for StartOptions {
             discovery: true,
             bind_ip: IpAddr::V4(Ipv4Addr::UNSPECIFIED),
             preferred_port: DEFAULT_PORT,
+            home: crate::transfer::home::real_home(),
         }
     }
 }
@@ -159,7 +163,7 @@ impl AppCore {
             identity: Arc::new(identity),
             events,
             found: Default::default(),
-            home: crate::transfer::home::real_home(),
+            home: opts.home,
         };
         let core = Core {
             shared: shared.clone(),

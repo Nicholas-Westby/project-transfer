@@ -64,6 +64,7 @@ pub fn live(dir: &Path) -> (Arc<AppCore>, Harness<'static, App>) {
         discovery: false,
         bind_ip: IpAddr::V4(Ipv4Addr::LOCALHOST),
         preferred_port: 0,
+        home: Some(dir.join("user")),
     };
     let core = Arc::new(
         AppCore::start_with(Store::open_at(dir.join("home")).unwrap(), None, opts).unwrap(),

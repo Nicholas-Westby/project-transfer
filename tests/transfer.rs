@@ -103,7 +103,8 @@ async fn pull_mirrors_into_a_new_local_project() {
         .await;
 
     let (preview, summary) = pull(&a, &b, p.id).await;
-    let beds = a.dev().join("Orchard/beds");
+    // Part by part, so the text compared below has this system's separators.
+    let beds = a.dev().join("Orchard").join("beds");
     assert_eq!(preview.folders[0].dest_path, beds.display().to_string());
     assert!(summary.failures.is_empty(), "{:?}", summary.failures);
     assert_eq!(tree(&beds), tree(&theirs));

@@ -43,9 +43,10 @@ pub fn with_package_version(toml: &str, new: &str) -> Result<String> {
 pub fn with_lock_version(lock: &str, package: &str, new: &str) -> Result<String> {
     let mut lines: Vec<String> = lock.split('\n').map(str::to_owned).collect();
     let name = format!("name = \"{package}\"");
+    // A Windows checkout's lines end with a CR as well.
     let at = lines
         .windows(2)
-        .position(|w| w[0] == name && w[1].starts_with("version = \""))
+        .position(|w| w[0].trim_end() == name && w[1].starts_with("version = \""))
         .with_context(|| format!("Cargo.lock has no entry for {package}"))?;
     lines[at + 1] = requoted(&lines[at + 1], new);
     Ok(lines.join("\n"))
@@ -94,8 +95,11 @@ pub fn bump(root: &Path) -> Result<String> {
     let toml = std::fs::read_to_string(&toml_path).context("could not read Cargo.toml")?;
     let next = next_patch(&package_version(&toml)?)?;
     let lock = std::fs::read_to_string(&lock_path).context("could not read Cargo.lock")?;
-    std::fs::write(&toml_path, with_package_version(&toml, &next)?)?;
-    std::fs::write(&lock_path, with_lock_version(&lock, PACKAGE, &next)?)?;
+    // Both worked out before either is written, so a failure bumps neither.
+    let toml = with_package_version(&toml, &next)?;
+    let lock = with_lock_version(&lock, PACKAGE, &next)?;
+    std::fs::write(&toml_path, toml)?;
+    std::fs::write(&lock_path, lock)?;
     git(root, &["add", "Cargo.toml", "Cargo.lock"])?;
     Ok(next)
 }
@@ -155,5 +159,26 @@ mod tests {
         assert!(bumped.contains("name = \"project-transfer\"\nversion = \"0.1.5\"\n"));
         assert!(bumped.contains("name = \"foo\"\nversion = \"1.2.3\"\n"));
         assert!(with_lock_version(LOCK, "missing", "0.1.5").is_err());
+    }
+
+    #[test]
+    fn a_checkout_with_crlf_line_ends_is_bumped_and_keeps_them() {
+        let crlf = |s: &str| s.replace('\n', "\r\n");
+        let bumped = with_package_version(&crlf(TOML), "0.1.5").unwrap();
+        assert_eq!(bumped, crlf(&TOML.replace("0.1.4", "0.1.5")));
+        let bumped = with_lock_version(&crlf(LOCK), PACKAGE, "0.1.5").unwrap();
+        assert_eq!(bumped, crlf(&LOCK.replace("0.1.4", "0.1.5")));
+    }
+
+    #[test]
+    fn a_failed_bump_leaves_cargo_toml_as_it_was() {
+        let dir = tempfile::tempdir().unwrap();
+        git(dir.path(), &["init", "-q"]).unwrap();
+        let toml = dir.path().join("Cargo.toml");
+        std::fs::write(&toml, TOML).unwrap();
+        let lock = LOCK.replace("project-transfer", "renamed");
+        std::fs::write(dir.path().join("Cargo.lock"), lock).unwrap();
+        assert!(bump(dir.path()).is_err());
+        assert_eq!(std::fs::read_to_string(toml).unwrap(), TOML);
     }
 }

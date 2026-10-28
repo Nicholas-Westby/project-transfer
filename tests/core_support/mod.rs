@@ -23,6 +23,9 @@ pub fn start(dir: &Path) -> AppCore {
         discovery: false,
         bind_ip: IpAddr::V4(Ipv4Addr::LOCALHOST),
         preferred_port: 0,
+        // Not the real home: on Windows the temp folder is inside it, and
+        // the other core would place this one's folders back on the originals.
+        home: Some(dir.join("user")),
     };
     let core = AppCore::start_with(Store::open_at(dir.join("home")).unwrap(), None, opts).unwrap();
     core.act(Action::SetProjectsFolder(dir.join("Dev")));

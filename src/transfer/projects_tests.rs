@@ -145,7 +145,11 @@ fn names_are_checked_for_the_receiving_system() {
         "{err}"
     );
     // A Mac holds "CON" and "notes:old" fine, but no system holds a slash.
-    assert!(check_names_for(&["CON", "notes:old"], Os::MacOs, "Desk").is_ok());
+    // Windows also checks each name as a path on its own disk, which can't
+    // hold these.
+    if !cfg!(windows) {
+        assert!(check_names_for(&["CON", "notes:old"], Os::MacOs, "Desk").is_ok());
+    }
     assert!(check_names_for(&["a/b"], Os::MacOs, "Desk").is_err());
     // The name is checked as stored; a trailing space is not trimmed away.
     assert!(check_names_for(&["app "], Os::Windows, "Desk").is_err());

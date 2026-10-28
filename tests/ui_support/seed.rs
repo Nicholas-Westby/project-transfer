@@ -28,6 +28,15 @@ pub fn now_ms() -> i64 {
     project_transfer::transfer::projects::now_ms()
 }
 
+/// The system the tests aren't running on, which a command can come from.
+pub fn elsewhere() -> Os {
+    if cfg!(windows) {
+        Os::MacOs
+    } else {
+        Os::Windows
+    }
+}
+
 pub fn seeded_state() -> UiState {
     let me = InstanceSettings {
         id: id(1),
@@ -88,7 +97,7 @@ pub fn seeded_state() -> UiState {
         id: id(31),
         label: "Fetch dependencies".into(),
         line: "make deps".into(),
-        created_on: Os::Windows,
+        created_on: elsewhere(),
         updated_at_ms: 0,
         deleted: false,
         last_run_hash: None,

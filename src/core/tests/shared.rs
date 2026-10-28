@@ -230,7 +230,7 @@ fn an_edit_wins_over_a_version_stamped_ahead_of_this_clock() {
     store_in(dir.path())
         .save_projects(std::slice::from_ref(&p))
         .unwrap();
-    let core = AppCore::start_with(store_in(dir.path()), None, opts()).unwrap();
+    let core = AppCore::start_with(store_in(dir.path()), None, opts(dir.path())).unwrap();
     core.act(Action::EditCommand(
         p.id,
         c.id,
@@ -266,7 +266,7 @@ fn garden_with_releases(dir: &Path, links: &[uuid::Uuid]) -> AppCore {
         description: Default::default(),
     };
     store_in(dir).save_projects(&[p]).unwrap();
-    AppCore::start_with(store_in(dir), None, opts()).unwrap()
+    AppCore::start_with(store_in(dir), None, opts(dir)).unwrap()
 }
 
 #[test]

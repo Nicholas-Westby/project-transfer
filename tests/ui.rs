@@ -5,8 +5,10 @@ mod ui_support;
 
 use egui_kittest::kittest::Queryable;
 use project_transfer::core::{Action, TransferState};
-use project_transfer::model::Direction;
+use project_transfer::model::{Direction, Os};
 use project_transfer::ui::Confirm;
+use project_transfer::ui::widgets::display_path;
+use ui_support::seed::elsewhere;
 use ui_support::{FakeBackend, live, sample_preview, ui_harness};
 
 #[test]
@@ -30,8 +32,9 @@ fn a_created_project_shows_its_folders() {
     });
     core.settle();
     h.run();
-    // The first project opens by itself.
-    h.get_by_label(&garden.display().to_string());
+    // The first project opens by itself. Its path starts with `~` when the
+    // temp folder is inside the home folder, as on Windows.
+    h.get_by_label(&display_path(&garden));
     h.get_by_label("Primary");
 }
 
@@ -135,7 +138,11 @@ fn a_received_command_shows_its_text_before_it_runs() {
     h.get_by_label("Run Fetch dependencies?");
     // Once in the list, once in full in the dialog.
     assert_eq!(h.get_all_by_label("make deps").count(), 2);
-    h.get_by_label_contains("created on Windows");
+    let made = match elsewhere() {
+        Os::MacOs => "macOS",
+        Os::Windows => "Windows",
+    };
+    h.get_by_label_contains(&format!("created on {made}"));
     assert!(fake.actions().is_empty());
     h.get_by_label("Run Fetch dependencies").click();
     h.run();
